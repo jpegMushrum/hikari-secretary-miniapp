@@ -1,0 +1,163 @@
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    public code: string,
+  ) {
+    super(
+      status === 401
+        ? 'Сессия истекла. Откройте приложение заново из Telegram.'
+        : status === 403
+          ? 'Пока приложение доступно только администраторам клуба.'
+          : code === 'capacity_limit'
+            ? 'Достигнут лимит: не более пяти активных мероприятий или публикаций.'
+            : status === 409
+              ? 'Состояние изменилось. Обновите страницу и повторите действие.'
+              : status === 400
+                ? 'Проверьте заполненные поля.'
+                : 'Не удалось получить ответ сервера. Попробуйте ещё раз.',
+    )
+  }
+}
+
+type TelegramApp = {
+  initData: string
+  ready?: () => void
+  expand?: () => void
+  BackButton?: {
+    show: () => void
+    hide: () => void
+    onClick: (fn: () => void) => void
+    offClick: (fn: () => void) => void
+  }
+}
+declare global {
+  interface Window {
+    Telegram?: { WebApp?: TelegramApp }
+  }
+}
+
+async function request(path: string, options: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(options.headers)
+  const initData = window.Telegram?.WebApp?.initData
+  if (initData) headers.set('Authorization', 'tma ' + initData)
+  if (options.body && typeof options.body === 'string')
+    headers.set('Content-Type', 'application/json')
+  let response: Response
+  try {
+    response = await fetch('/api/v1/admin' + path, { ...options, headers })
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error
+    throw new Error('Нет соединения с сервером. Проверьте подключение.')
+  }
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}))
+    throw new ApiError(response.status, payload.error ?? 'unknown')
+  }
+  return response
+}
+
+export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const response = await request(path, options)
+  return response.status === 204 ? (undefined as T) : (response.json() as Promise<T>)
+}
+export async function apiBlob(path: string, signal?: AbortSignal) {
+  return (await request(path, { signal })).blob()
+}
+
+export type Page<T> = {
+  items: T[]
+  page: { number: number; size: number; total_items: number; total_pages: number }
+}
+export type Administrator = {
+  telegram_id: number
+  first_name: string
+  last_name: string
+  username: string
+}
+export type Person = {
+  id: number
+  full_name: string | null
+  display_name: string
+  username: string | null
+  telegram_user_id: number
+  visits: number
+  feedback_count: number
+  last_visit_at: string | null
+  is_russian_citizen: boolean | null
+  is_itmo_student: boolean | null
+}
+export type ClubEvent = {
+  id: number
+  publication_id: number | null
+  title: string
+  starts_at: string
+  ends_at: string
+  status: 'active' | 'completed' | 'cancelled'
+  published: boolean
+  registrations: number
+  cancelled_registrations: number
+  attended: number
+  created_at: string
+}
+export type Participant = {
+  person_id: number
+  telegram_user_id: number
+  full_name: string
+  username: string | null
+  registered_at: string
+  cancelled_at: string | null
+  status: string
+  attended: boolean | null
+  is_russian_citizen: boolean | null
+  is_itmo_student: boolean | null
+  needs_pass: boolean
+}
+export type Feedback = {
+  author_name: string
+  event_title: string | null
+  id: number
+  person_id: number
+  event_id: number | null
+  text: string
+  created_at: string
+}
+export type FeedbackDetail = Omit<Feedback, 'author_name'> & {
+  full_name: string | null
+  username: string | null
+  telegram_user_id: number
+  event_title: string | null
+}
+export type Publication = {
+  entities: MessageEntity[] | null
+  rich_message: Record<string, unknown> | null
+  media: { position: number; url: string }[]
+  event: { title: string; starts_at: string; ends_at: string; status: string } | null
+  id: number
+  text: string
+  status: string
+  scheduled_at: string | null
+  media_ids: string[]
+  deliveries: {
+    target_key: string
+    target_name: string
+    status: string
+    last_error: string | null
+  }[]
+}
+export type MessageEntity = {
+  type: string
+  offset: number
+  length: number
+  url?: string
+  user?: { id: number }
+}
+export type AISettings = { jlpt_level: string; admin_comment: string | null; enabled: boolean }
+export type AIJob = {
+  id: number
+  scheduled_for: string
+  status: string
+  attempts: number
+  last_error: string | null
+  publication_id: number | null
+  topic: Record<string, unknown> | null
+}

@@ -1,0 +1,79 @@
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import { BrowserRouter, Navigate, Route, Routes, Link } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import Layout from './app/Layout'
+import { ErrorBoundary } from './app/ErrorBoundary'
+import {
+  modules,
+  EventDetail,
+  PublicationsPage,
+  PublicationDetail,
+  FeedbackDetail,
+} from './app/modules'
+import { ApiError } from './shared/api'
+import './styles.css'
+import { initializeTelegram } from './app/telegram'
+
+const client = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30000,
+      refetchOnWindowFocus: false,
+      retry: (count, error) => !(error instanceof ApiError && error.status < 500) && count < 1,
+    },
+    mutations: { retry: false },
+  },
+})
+const root = ReactDOM.createRoot(document.getElementById('root')!)
+function start() {
+  root.render(
+    <React.StrictMode>
+      <ErrorBoundary>
+        <QueryClientProvider client={client}>
+          <BrowserRouter>
+            <Routes>
+              <Route element={<Layout />}>
+                <Route index element={<Navigate to="/admin/events" replace />} />
+                <Route path="/admin" element={<Navigate to="/admin/events" replace />} />
+                {modules.map((m) => (
+                  <Route key={m.id} path={m.path} element={<m.component />} />
+                ))}
+                <Route
+                  path="/admin/events/new"
+                  element={<Navigate to="/admin/events/drafts?status=draft" replace />}
+                />
+                <Route path="/admin/events/drafts" element={<PublicationsPage />} />
+                <Route path="/admin/publications/:id" element={<PublicationDetail />} />
+                <Route path="/admin/events/:id" element={<EventDetail />} />
+                <Route path="/admin/feedback/:id" element={<FeedbackDetail />} />
+                <Route
+                  path="*"
+                  element={
+                    <div className="empty-state">
+                      <h1>Страница не найдена</h1>
+                      <Link className="text-link" to="/admin/events">
+                        К мероприятиям
+                      </Link>
+                    </div>
+                  }
+                />
+              </Route>
+            </Routes>
+          </BrowserRouter>
+        </QueryClientProvider>
+      </ErrorBoundary>
+    </React.StrictMode>,
+  )
+}
+void initializeTelegram().then(start, (error) =>
+  root.render(
+    <main className="page-content">
+      <h1>Не удалось войти</h1>
+      <p>{String(error.message)}</p>
+      <button className="button primary" onClick={() => window.location.reload()}>
+        Повторить
+      </button>
+    </main>,
+  ),
+)
