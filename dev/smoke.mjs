@@ -7,7 +7,7 @@ async function read(path) {
   assert.equal(response.status, 200, path)
   return response
 }
-const html = await (await read('/admin/events/1007')).text()
+const html = await (await read('/admin/events')).text()
 assert.match(html, /data-theme="dark"/)
 assert.match(html, /<div id="root"><\/div>/)
 const assets = [...html.matchAll(/(?:src|href)="(\/assets\/[^" ]+)"/g)].map((m) => m[1])
@@ -24,7 +24,7 @@ assert.equal((await (await read('/api/v1/admin/me')).json()).telegram_id, 123456
 for (const path of [
   '/people?sort=visits&order=desc',
   '/events?status=active',
-  '/events/1007/participants?needs_pass=true',
+  '/event-workspace',
   '/feedback?kind=event',
   '/ai/history',
   '/publications?status=draft',
@@ -35,9 +35,6 @@ for (const path of [
   console.log('OK', path, 'items=' + result.items.length)
 }
 for (const path of [
-  '/events/1007',
-  '/publications/1007',
-  '/feedback/1001',
   '/ai/settings',
   '/targets',
 ])
@@ -48,8 +45,16 @@ const foreign = await fetch(base + '/api/v1/admin/me', {
 assert.equal(foreign.status, 403)
 const privateAPI = await fetch(base + '/api/internal/bot/v1/people')
 assert.equal(privateAPI.status, 404)
+for (const resource of ['events', 'feedback']) {
+  const page = await (await read('/api/v1/admin/' + resource)).json()
+  if (page.items.length) {
+    const id = page.items[0].id
+    await read('/api/v1/admin/' + resource + '/' + id)
+    if (resource === 'events') await read('/api/v1/admin/events/' + id + '/participants?needs_pass=true')
+  } else console.log('SKIP ' + resource + ' detail: empty database')
+}
 const drafts = await (await read('/api/v1/admin/publications?status=draft')).json()
-assert.ok(drafts.items.length > 0, 'sample draft available')
+if (!drafts.items.length) console.log('SKIP draft detail: no drafts in this database')
 for (const item of drafts.items) {
   const publication = await (await read('/api/v1/admin/publications/' + item.id)).json()
   assert.ok(Array.isArray(publication.media), 'preview media contract')

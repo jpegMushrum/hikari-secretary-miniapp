@@ -10,24 +10,22 @@ TanStack Query и TanStack Table. Тёмная тема по умолчанию,
 Из корня **интеграционного** репозитория:
 
 ```powershell
-docker compose -f docker-compose.dev.yml up -d --build
+docker compose -f docker-compose.bot-local.yml up -d --build
 ```
 
-Открыть **http://localhost:5173**. HTTPS, Telegram и `.env` не требуются.
-Порядок: PostgreSQL 18 → миграции → демонстрационные данные → Go API →
-локальный gateway → nginx с собранным frontend. Бот не запускается.
-
-Это отдельный Compose-проект `hikari-miniapp-dev` со своими volumes.
-Он не импортирует рабочий SQLite, не читает реальные ключи и не обращается
-к Telegram или ИИ. Имена, аккаунты, встречи и отзывы в нём вымышленные.
-Данные сохраняются при пересборке; seed выполняется один раз и не
-перезаписывает изменения. Публикации можно поставить в очередь, но без
-бота доставка останется в ожидании. Это видно по статусу анонса.
+Открыть **http://localhost:5173**. Это самостоятельный локальный стек:
+PostgreSQL → миграции → Go API → gateway для браузерного входа → miniapp,
+а также настоящий тестовый бот из корневого `.env`.
+Проект `hikari-miniapp-dev`, volumes и порты сохранены. База выбирается
+через `LOCAL_DATABASE_NAME` (по умолчанию существующая копия импорта
+`hikari_bot_local_20261117`). Эта база должна быть подготовлена заранее;
+демоданные автоматически не создаются. Workers бота включены и отправляют
+публикации в настроенные цели. Не используйте здесь production-токен.
 
 ```powershell
-docker compose -f docker-compose.dev.yml ps
-docker compose -f docker-compose.dev.yml logs --tail=100 backend gateway miniapp
-docker compose -f docker-compose.dev.yml down
+docker compose -f docker-compose.bot-local.yml ps
+docker compose -f docker-compose.bot-local.yml logs --tail=100 backend gateway miniapp
+docker compose -f docker-compose.bot-local.yml down
 ```
 
 `down` сохраняет данные. Не добавляйте `-v`, если хотите сохранить созданные
@@ -163,18 +161,18 @@ finally { Remove-Item Env:TEST_DATABASE_URL }
 Из корня интеграционного репозитория:
 
 ```powershell
-docker compose -f docker-compose.dev.yml -f docker-compose.bot-local.yml up -d --build
+docker compose -f docker-compose.bot-local.yml up -d --build
 ```
 
-Overlay использует токен тестового бота и ADMIN_IDS из корневого `.env`.
+Compose использует токен тестового бота и ADMIN_IDS из корневого `.env`.
 Бот и miniapp работают с одной базой `hikari_bot_local_20261117` внутри
 dev PostgreSQL. Это отдельная копия ранее импортированной базы, созданная
 17 ноября 2026: 2 участника, 16 мероприятий, 2 отзыва, 11 публикаций.
 Исходная база и демонстрационная `hikari_dev` сохранены; синхронизации
-с исходной базой нет. Demo seed в этом режиме отключён.
+с исходной базой нет. Автоматического demo seed нет.
 
 База-копия уже подготовлена на текущей машине. На новой машине её нужно
-сначала создать и восстановить из дампа: overlay сам SQLite не импортирует.
+сначала создать и восстановить из дампа: этот Compose сам SQLite не импортирует.
 Локальный дамп находится в `data-miniapp-backup/imported-20261117.dump`
 (приватные данные, каталог исключён из Git). Не удаляйте Docker volume
 командой `down -v`, если хотите сохранить эту копию.
@@ -188,7 +186,7 @@ dev PostgreSQL. Это отдельная копия ранее импортир
 
 `MINIAPP_URL` здесь пустой: HTTP localhost открывается вручную в браузере,
 кнопка Telegram WebApp требует отдельного HTTPS адреса.
-`BOT_BACKGROUND_WORKERS_ENABLED=true` в overlay включает публикации,
+`BOT_BACKGROUND_WORKERS_ENABLED=true` в локальном Compose включает публикации,
 напоминания и уведомления для полного тестирования. Постановка в очередь
 приводит к реальной отправке в выбранные Telegram-цели. Перед первым
 включением проверены импортированные очереди: старые публикации не имеют
@@ -206,11 +204,12 @@ Backend `/event-workspace` обеспечивает общую серверну�
 Остановить только тестового бота:
 
 ```powershell
-docker compose -f docker-compose.dev.yml -f docker-compose.bot-local.yml stop bot
+docker compose -f docker-compose.bot-local.yml stop bot
 ```
 
-Для возврата к демоданным сначала остановите бота этой командой, затем
-запустите обычный `docker compose -f docker-compose.dev.yml up -d`.
+Отдельный режим с автоматическим demo seed удалён. Для работы без бота
+можно запускать только нужные сервисы этого же файла, например `up -d miniapp`;
+если бот уже запущен, сначала выполните `stop bot`.
 
 ## Следующие шаги
 
