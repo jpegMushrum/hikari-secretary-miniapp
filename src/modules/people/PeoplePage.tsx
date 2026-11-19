@@ -14,7 +14,7 @@ export default function PeoplePage() {
     'is_itmo_student',
   ])
   const columns: ColumnDef<Person, unknown>[] = [
-    { accessorKey: 'id', header: 'ID', enableSorting: false },
+    { accessorKey: 'id', header: 'ID' },
     {
       id: 'name',
       accessorFn: (p) => p.full_name || p.display_name,
@@ -52,7 +52,6 @@ export default function PeoplePage() {
     {
       accessorKey: 'feedback_count',
       header: 'Отзывы',
-      enableSorting: false,
       cell: ({ row }) => (
         <Link
           className="text-link"
@@ -66,13 +65,11 @@ export default function PeoplePage() {
     {
       accessorKey: 'is_itmo_student',
       header: 'ИТМО',
-      enableSorting: false,
       cell: (info) => yesNo(info.getValue() as boolean | null),
     },
     {
       accessorKey: 'is_russian_citizen',
       header: 'Гражданство РФ',
-      enableSorting: false,
       cell: (info) => yesNo(info.getValue() as boolean | null),
     },
   ]

@@ -16,6 +16,7 @@ import {
   getCoreRowModel,
   useReactTable,
   type ColumnDef,
+  type RowData,
   type VisibilityState,
 } from '@tanstack/react-table'
 import {
@@ -31,6 +32,12 @@ import { api, type Page } from './api'
 import { positiveInteger } from './format'
 import { ErrorState } from './components'
 import './column-drag.css'
+
+declare module '@tanstack/react-table' {
+  interface ColumnMeta<TData extends RowData, TValue> {
+    sortField?: string
+  }
+}
 
 export const AdministratorContext = createContext(0)
 
@@ -418,38 +425,38 @@ export function DataTable<T>({
           <thead>
             {table.getHeaderGroups().map((group) => (
               <tr key={group.id}>
-                {group.headers.map((header) => (
-                  <th
-                    key={header.id}
-                    aria-sort={
-                      list.sort === header.column.id
-                        ? list.order === 'asc'
-                          ? 'ascending'
-                          : 'descending'
-                        : undefined
-                    }
-                  >
-                    {header.column.getCanSort() ? (
-                      <button
-                        className="sort-button"
-                        onClick={() => list.setSort(header.column.id)}
-                      >
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                        {list.sort === header.column.id ? (
-                          list.order === 'desc' ? (
-                            <ArrowDown size={13} />
+                {group.headers.map((header) => {
+                  const sortField = header.column.columnDef.meta?.sortField ?? header.column.id
+                  return (
+                    <th
+                      key={header.id}
+                      aria-sort={
+                        list.sort === sortField
+                          ? list.order === 'asc'
+                            ? 'ascending'
+                            : 'descending'
+                          : undefined
+                      }
+                    >
+                      {header.column.getCanSort() ? (
+                        <button className="sort-button" onClick={() => list.setSort(sortField)}>
+                          {flexRender(header.column.columnDef.header, header.getContext())}
+                          {list.sort === sortField ? (
+                            list.order === 'desc' ? (
+                              <ArrowDown size={13} />
+                            ) : (
+                              <ArrowUp size={13} />
+                            )
                           ) : (
-                            <ArrowUp size={13} />
-                          )
-                        ) : (
-                          <ArrowUpDown size={13} />
-                        )}
-                      </button>
-                    ) : (
-                      flexRender(header.column.columnDef.header, header.getContext())
-                    )}
-                  </th>
-                ))}
+                            <ArrowUpDown size={13} />
+                          )}
+                        </button>
+                      ) : (
+                        flexRender(header.column.columnDef.header, header.getContext())
+                      )}
+                    </th>
+                  )
+                })}
               </tr>
             ))}
           </thead>

@@ -70,7 +70,7 @@ export default function EventDetail() {
     onSuccess: () => void client.invalidateQueries(),
   })
   const columns: ColumnDef<Participant, unknown>[] = [
-    { accessorKey: 'person_id', header: 'ID', enableSorting: false },
+    { accessorKey: 'person_id', header: 'ID' },
     {
       id: 'name',
       accessorKey: 'full_name',
@@ -80,8 +80,8 @@ export default function EventDetail() {
     },
     {
       id: 'telegram',
+      accessorFn: (p) => p.username || String(p.telegram_user_id),
       header: 'Telegram',
-      enableSorting: false,
       cell: ({ row }) => (
         <TelegramLink username={row.original.username} id={row.original.telegram_user_id} />
       ),
@@ -94,13 +94,11 @@ export default function EventDetail() {
     {
       accessorKey: 'cancelled_at',
       header: 'Время отмены',
-      enableSorting: false,
       cell: (i) => dateTime(i.getValue() as string | null),
     },
     {
       accessorKey: 'status',
       header: 'Статус',
-      enableSorting: false,
       cell: (i) => (
         <Status
           value={i.getValue() as string}
@@ -112,7 +110,6 @@ export default function EventDetail() {
     {
       accessorKey: 'attended',
       header: 'Был на встрече',
-      enableSorting: false,
       cell: (i) => yesNo(i.getValue() as boolean | null),
     },
     {
@@ -133,13 +130,11 @@ export default function EventDetail() {
     {
       accessorKey: 'is_russian_citizen',
       header: 'Гражданин РФ',
-      enableSorting: false,
       cell: (i) => yesNo(i.getValue() as boolean | null),
     },
     {
       accessorKey: 'is_itmo_student',
       header: 'Студент ИТМО',
-      enableSorting: false,
       cell: (i) => yesNo(i.getValue() as boolean | null),
     },
   ]

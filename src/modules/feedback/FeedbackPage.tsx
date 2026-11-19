@@ -20,11 +20,10 @@ export default function FeedbackPage() {
     'to',
   ])
   const columns: ColumnDef<Feedback, unknown>[] = [
-    { accessorKey: 'id', header: 'ID', enableSorting: false },
+    { accessorKey: 'id', header: 'ID' },
     {
       accessorKey: 'text',
       header: 'Отзыв',
-      enableSorting: false,
       enableHiding: false,
       cell: ({ row }) => (
         <div className="feedback-preview-cell">
@@ -44,8 +43,8 @@ export default function FeedbackPage() {
     },
     {
       accessorKey: 'event_id',
+      meta: { sortField: 'event_title' },
       header: 'О чём',
-      enableSorting: false,
       cell: ({ row }) =>
         row.original.event_id ? (
           <Link className="text-link" to={'/admin/events/' + row.original.event_id}>
@@ -58,7 +57,6 @@ export default function FeedbackPage() {
     {
       accessorKey: 'author_name',
       header: 'Участник',
-      enableSorting: false,
       cell: ({ row }) => <TelegramMentions text={row.original.author_name} />,
     },
     { accessorKey: 'created_at', header: 'Дата', cell: (i) => dateTime(i.getValue() as string) },

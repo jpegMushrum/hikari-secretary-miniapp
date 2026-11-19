@@ -15,12 +15,11 @@ export default function PublicationsPage() {
   const location = useLocation(),
     list = useList<Item>('/publications', { sort: 'created_at', order: 'desc' }, ['status'])
   const columns: ColumnDef<Item, unknown>[] = [
-    { accessorKey: 'id', header: 'ID', enableSorting: false },
+    { accessorKey: 'id', header: 'ID' },
     {
       id: 'text',
       accessorKey: 'text',
       header: 'Анонс',
-      enableSorting: false,
       enableHiding: false,
       cell: ({ row }) => (
         <Link
@@ -35,7 +34,6 @@ export default function PublicationsPage() {
     {
       accessorKey: 'status',
       header: 'Статус',
-      enableSorting: false,
       cell: (i) => <Status value={i.getValue() as string} />,
     },
     { accessorKey: 'created_at', header: 'Получен', cell: (i) => dateTime(i.getValue() as string) },

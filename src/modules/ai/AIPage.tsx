@@ -38,11 +38,10 @@ export default function AIPage() {
     return String(t?.title_ru || t?.title || t?.theme || t?.topic || 'Материал #' + job.id)
   }
   const columns: ColumnDef<AIJob, unknown>[] = [
-    { accessorKey: 'id', header: 'ID', enableSorting: false },
+    { accessorKey: 'id', header: 'ID' },
     {
       id: 'title',
       header: 'Тема',
-      enableSorting: false,
       enableHiding: false,
       accessorFn: title,
       cell: ({ row }) => (
@@ -55,7 +54,6 @@ export default function AIPage() {
     {
       accessorKey: 'status',
       header: 'Статус',
-      enableSorting: false,
       cell: (i) => (
         <Status
           value={i.getValue() as string}
@@ -63,7 +61,7 @@ export default function AIPage() {
         />
       ),
     },
-    { accessorKey: 'attempts', header: 'Попытки', enableSorting: false },
+    { accessorKey: 'attempts', header: 'Попытки' },
   ]
   function submit(e: FormEvent) {
     e.preventDefault()

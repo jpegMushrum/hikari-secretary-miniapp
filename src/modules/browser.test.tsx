@@ -49,6 +49,26 @@ it('searches feedback for zero without forwarding a stale zero ID filter', async
   expect(url.searchParams.get('event_id')).toBe('042')
 })
 
+it('sorts feedback by the displayed subject in both directions and keeps the event filter', async () => {
+  const user = userEvent.setup()
+  const fetcher = vi.fn(async (_input: string) =>
+    json({ items: [], page: { number: 1, size: 10, total_items: 0, total_pages: 0 } }),
+  )
+  vi.stubGlobal('fetch', fetcher)
+  mount(<FeedbackPage />, '/admin/feedback?page=2&event_id=42')
+  const subject = await screen.findByRole('button', { name: 'О чём' })
+  for (const order of ['asc', 'desc']) {
+    await user.click(subject)
+    await waitFor(() => {
+      const params = new URL(fetcher.mock.calls.at(-1)![0], 'http://localhost').searchParams
+      expect(params.get('sort')).toBe('event_title')
+      expect(params.get('order')).toBe(order)
+      expect(params.get('page')).toBe('1')
+      expect(params.get('event_id')).toBe('42')
+    })
+  }
+})
+
 it('people table sends server sorting/filtering/pagination and persists column choices', async () => {
   const user = userEvent.setup()
   const fetcher = vi.fn(async (_input: string, _options?: RequestInit) =>

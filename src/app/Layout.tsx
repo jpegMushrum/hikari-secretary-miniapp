@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { useQuery } from '@tanstack/react-query'
 import { Menu, Moon, Sun, X, ArrowUpRight } from 'lucide-react'
 import { modules } from './modules'
+import { hikariRelease, version } from '../../package.json'
 import { api, type Administrator } from '../shared/api'
 import { ErrorState, Loading } from '../shared/components'
 import { AdministratorContext } from '../shared/table'
@@ -144,6 +145,14 @@ export default function Layout() {
           ))}
         </nav>
         <div className="sidebar-bottom">
+          <p className="release-caption">
+            Hikari Secretary ·{' '}
+            <time dateTime={hikariRelease.date}>
+              {hikariRelease.date.split('-').reverse().join('.')}
+            </time>
+            <br />
+            Бот {hikariRelease.bot} · Backend {hikariRelease.backend} · Miniapp {version}
+          </p>
           <div className="identity">
             <span className="avatar">{me.data?.first_name?.slice(0, 1) || 'H'}</span>
             <div>

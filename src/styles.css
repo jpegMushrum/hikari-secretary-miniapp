@@ -229,6 +229,7 @@ small {
   display: flex;
   flex-direction: column;
   padding: 30px 18px 0;
+  overflow-y: auto;
   z-index: 30;
 }
 .brand {
@@ -295,6 +296,13 @@ small {
 }
 .sidebar-bottom {
   margin-top: auto;
+}
+.release-caption {
+  margin: 16px 10px 12px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+  text-wrap: pretty;
 }
 .identity {
   display: flex;

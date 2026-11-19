@@ -1,6 +1,11 @@
 {
   "name": "hikari-secretary-miniapp",
-  "version": "0.1.1",
+  "version": "0.1.2",
+  "hikariRelease": {
+    "date": "2026-11-19",
+    "bot": "0.9.0",
+    "backend": "0.3.2"
+  },
   "private": true,
   "type": "module",
   "scripts": {

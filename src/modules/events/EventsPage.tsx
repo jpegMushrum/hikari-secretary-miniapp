@@ -22,7 +22,7 @@ export default function EventsPage() {
     'starts_to',
   ])
   const columns: ColumnDef<WorkspaceItem, unknown>[] = [
-    { accessorKey: 'id', header: 'ID', enableSorting: false },
+    { accessorKey: 'id', header: 'ID' },
     {
       accessorKey: 'title',
       header: 'Мероприятие',
@@ -50,19 +50,16 @@ export default function EventsPage() {
     {
       accessorKey: 'status',
       header: 'Статус',
-      enableSorting: false,
       cell: (i) => <Status value={i.getValue() as string} />,
     },
     {
       accessorKey: 'registrations',
       header: 'Регистрации',
-      enableSorting: false,
       cell: (i) => <span className="number">{String(i.getValue())}</span>,
     },
     {
       accessorKey: 'attended',
       header: 'Посетили',
-      enableSorting: false,
       cell: ({ row }) =>
         row.original.status === 'active' || row.original.kind === 'draft' ? (
           <span className="muted">—</span>
