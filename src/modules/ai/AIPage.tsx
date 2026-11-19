@@ -38,6 +38,7 @@ export default function AIPage() {
     return String(t?.title_ru || t?.title || t?.theme || t?.topic || 'Материал #' + job.id)
   }
   const columns: ColumnDef<AIJob, unknown>[] = [
+    { accessorKey: 'id', header: 'ID', enableSorting: false },
     {
       id: 'title',
       header: 'Тема',
@@ -71,10 +72,7 @@ export default function AIPage() {
   }
   return (
     <>
-      <PageHeader
-        title="ИИ · материалы клуба"
-        description="Настройки и история тем для разговорных встреч."
-      />
+      <PageHeader title="ИИ" />
       {settings.isPending ? (
         <Loading />
       ) : settings.error ? (

@@ -1,0 +1,43 @@
+.columns-menu > .columns-popover {
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+
+.columns-menu > .columns-popover[data-side='above'] {
+  top: auto;
+  bottom: 100%;
+}
+
+.column-grip {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: grab;
+}
+
+.column-option[data-drop-target] {
+  background: var(--selected);
+  box-shadow: inset 0 -2px var(--accent);
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .column-grip {
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+  }
+
+  .columns-popover .column-option > .icon-button {
+    display: none;
+  }
+
+}

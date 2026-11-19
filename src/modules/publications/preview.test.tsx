@@ -75,3 +75,18 @@ it('preserves multiline small rich headings', () => {
   const html = renderToStaticMarkup(<PublicationPreview publication={publication} />)
   expect(html).toContain('<h3 class="rich-heading-4">Дата\nАдрес\nВремя</h3>')
 })
+
+it('links handles in rich text without nesting a link inside an authored link', () => {
+  const publication = {
+    rich_message: {
+      blocks: [
+        { type: 'paragraph', text: 'Вопросы к @club_member' },
+        { type: 'paragraph', text: { type: 'url', url: 'https://example.org', text: '@contact' } },
+      ],
+    },
+  } as unknown as Publication
+  const html = renderToStaticMarkup(<PublicationPreview publication={publication} />)
+  expect(html).toContain('href="https://t.me/club_member"')
+  expect(html).toContain('href="https://example.org/"')
+  expect(html).not.toContain('https://t.me/contact')
+})

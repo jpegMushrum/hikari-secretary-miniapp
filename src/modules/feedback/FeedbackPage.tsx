@@ -1,32 +1,45 @@
 import { Link, useLocation } from 'react-router-dom'
 import type { ColumnDef } from '@tanstack/react-table'
 import type { Feedback } from '../../shared/api'
-import { PageHeader, SelectFilter } from '../../shared/components'
+import { PageHeader, SearchInput, SelectFilter } from '../../shared/components'
 import { DataTable, useList } from '../../shared/table'
 import { dateTime } from '../../shared/format'
+import { TelegramMentions } from '../../shared/TelegramLink'
+import './feedback-preview.css'
 export default function FeedbackPage() {
   const location = useLocation()
+  const params = new URLSearchParams(location.search)
+  const scopedIds = ['event_id', 'author_id'].filter((key) =>
+    /^\+?0*[1-9]\d*$/.test(params.get(key) || ''),
+  )
   const list = useList<Feedback>('/feedback', { sort: 'created_at', order: 'desc' }, [
     'kind',
-    'event_id',
-    'author_id',
+    'search',
+    ...scopedIds,
     'from',
     'to',
   ])
   const columns: ColumnDef<Feedback, unknown>[] = [
+    { accessorKey: 'id', header: 'ID', enableSorting: false },
     {
       accessorKey: 'text',
       header: 'Отзыв',
       enableSorting: false,
       enableHiding: false,
       cell: ({ row }) => (
-        <Link
-          className="feedback-preview"
-          to={'/admin/feedback/' + row.original.id}
-          state={{ from: location.pathname + location.search }}
-        >
-          {row.original.text}
-        </Link>
+        <div className="feedback-preview-cell">
+          <span className="feedback-preview">
+            <TelegramMentions text={row.original.text} />
+          </span>
+          <Link
+            className="feedback-open"
+            aria-label={'Открыть отзыв №' + row.original.id}
+            to={'/admin/feedback/' + row.original.id}
+            state={{ from: location.pathname + location.search }}
+          >
+            →
+          </Link>
+        </div>
       ),
     },
     {
@@ -46,6 +59,7 @@ export default function FeedbackPage() {
       accessorKey: 'author_name',
       header: 'Участник',
       enableSorting: false,
+      cell: ({ row }) => <TelegramMentions text={row.original.author_name} />,
     },
     { accessorKey: 'created_at', header: 'Дата', cell: (i) => dateTime(i.getValue() as string) },
   ]
@@ -53,7 +67,7 @@ export default function FeedbackPage() {
     <>
       <PageHeader
         title="Отзывы"
-        description="Что запомнилось участникам и что можно сделать лучше."
+        description="После посещения бот спросил: «Хотите оставить обратную связь?»"
       />
       <div className="toolbar">
         <SelectFilter
@@ -66,26 +80,16 @@ export default function FeedbackPage() {
             ['general', 'О клубе'],
           ]}
         />
-        <label className="filter">
-          <span>ID мероприятия</span>
-          <input
-            aria-label="ID мероприятия"
-            type="number"
-            min={1}
-            value={list.params.get('event_id') || ''}
-            onChange={(e) => list.set('event_id', e.target.value)}
-          />
-        </label>
-        <label className="filter">
-          <span>ID участника</span>
-          <input
-            aria-label="ID участника"
-            type="number"
-            min={1}
-            value={list.params.get('author_id') || ''}
-            onChange={(e) => list.set('author_id', e.target.value)}
-          />
-        </label>
+        <SearchInput
+          placeholder="Мероприятие, участник или ID"
+          value={list.params.get('search') || ''}
+          onChange={(value) => list.set('search', value)}
+        />
+        {scopedIds.map((key) => (
+          <span className="muted" key={key}>
+            {key === 'event_id' ? 'Мероприятие' : 'Участник'} #{params.get(key)}
+          </span>
+        ))}
         <button className="text-button" onClick={list.reset}>
           Сбросить
         </button>

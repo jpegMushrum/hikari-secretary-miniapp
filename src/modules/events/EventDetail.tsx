@@ -1,5 +1,5 @@
 import { useState, useContext } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
 import { api, ApiError, type ClubEvent, type Participant, type Publication } from '../../shared/api'
@@ -10,16 +10,14 @@ import {
   Loading,
   Status,
   SelectFilter,
-  booleanOptions,
 } from '../../shared/components'
 import { AdministratorContext, DataTable, useList } from '../../shared/table'
 import { dateTime, yesNo } from '../../shared/format'
-import { TelegramLink } from '../../shared/TelegramLink'
+import { TelegramLink, TelegramMentions } from '../../shared/TelegramLink'
 import { PublicationPreview } from '../publications/PublicationPreview'
 
 export default function EventDetail() {
   const { id } = useParams()
-  const location = useLocation()
   const client = useQueryClient()
   const admin = useContext(AdministratorContext)
   const preferenceKey = 'hikari.participant-view.' + admin
@@ -72,7 +70,14 @@ export default function EventDetail() {
     onSuccess: () => void client.invalidateQueries(),
   })
   const columns: ColumnDef<Participant, unknown>[] = [
-    { id: 'name', accessorKey: 'full_name', header: 'Участник', enableHiding: false },
+    { accessorKey: 'person_id', header: 'ID', enableSorting: false },
+    {
+      id: 'name',
+      accessorKey: 'full_name',
+      header: 'Участник',
+      enableHiding: false,
+      cell: ({ row }) => <TelegramMentions text={row.original.full_name} />,
+    },
     {
       id: 'telegram',
       header: 'Telegram',
@@ -83,8 +88,14 @@ export default function EventDetail() {
     },
     {
       accessorKey: 'registered_at',
-      header: 'Регистрация',
+      header: 'Время регистрации',
       cell: (i) => dateTime(i.getValue() as string),
+    },
+    {
+      accessorKey: 'cancelled_at',
+      header: 'Время отмены',
+      enableSorting: false,
+      cell: (i) => dateTime(i.getValue() as string | null),
     },
     {
       accessorKey: 'status',
@@ -111,11 +122,11 @@ export default function EventDetail() {
         <span
           title={`Гражданин РФ: ${yesNo(row.original.is_russian_citizen)}; Студент ИТМО: ${yesNo(row.original.is_itmo_student)}`}
         >
-          {row.original.is_russian_citizen == null || row.original.is_itmo_student == null
-            ? row.original.is_russian_citizen === false || row.original.is_itmo_student === false
-              ? 'Да'
-              : 'Уточнить данные'
-            : yesNo(row.original.needs_pass)}
+          {row.original.is_russian_citizen === false || row.original.is_itmo_student === false
+            ? 'Нужен'
+            : row.original.is_russian_citizen && row.original.is_itmo_student
+              ? 'Не нужен'
+              : 'Уточнить данные'}
         </span>
       ),
     },
@@ -137,7 +148,7 @@ export default function EventDetail() {
   const e = event.data
   return (
     <>
-      <BackLink to={location.state?.from || '/admin/events'}>Мероприятия</BackLink>
+      <BackLink to="/admin/events">На главную</BackLink>
       <PageHeader
         title={e.title}
         description={dateTime(e.starts_at) + ' — ' + dateTime(e.ends_at)}
@@ -234,7 +245,11 @@ export default function EventDetail() {
       <div className="toolbar">
         <SelectFilter
           label="Нужен пропуск"
-          options={booleanOptions}
+          options={[
+            ['', 'Все'],
+            ['true', 'Нужен'],
+            ['false', 'Не нужен'],
+          ]}
           value={list.params.get('needs_pass') || ''}
           onChange={(v) => list.set('needs_pass', v)}
         />

@@ -4,12 +4,10 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { statuses } from './format'
 
 export function PageHeader({
-  eyebrow,
   title,
   description,
   action,
 }: {
-  eyebrow?: string
   title: string
   description?: string
   action?: ReactNode
@@ -17,7 +15,6 @@ export function PageHeader({
   return (
     <header className="page-heading">
       <div>
-        <div className="eyebrow">{eyebrow ?? 'ПАНЕЛЬ КЛУБА'}</div>
         <h1>{title}</h1>
         {description && <p>{description}</p>}
       </div>

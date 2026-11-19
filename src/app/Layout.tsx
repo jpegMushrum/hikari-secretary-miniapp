@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Menu, Moon, Sun, X, ArrowUpRight } from 'lucide-react'
 import { modules } from './modules'
@@ -116,7 +116,7 @@ export default function Layout() {
             光
           </span>
           <div>
-            <strong>hikari</strong>
+            <strong>Hikari</strong>
             <span>японский клуб</span>
           </div>
           <button
@@ -144,11 +144,6 @@ export default function Layout() {
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <div className="club-note">
-            Место, где встречаются
-            <br />
-            люди и японская культура.
-          </div>
           <div className="identity">
             <span className="avatar">{me.data?.first_name?.slice(0, 1) || 'H'}</span>
             <div>
@@ -172,9 +167,9 @@ export default function Layout() {
             >
               <Menu size={22} />
             </button>
-            <span className="breadcrumb">
-              Клуб <span>/</span> {current?.label || 'Обзор'}
-            </span>
+            <Link className="breadcrumb" to={current?.path ?? '/admin'}>
+              {current?.label || 'Обзор'}
+            </Link>
           </div>
           <div>
             {environment.data?.local && (
@@ -207,10 +202,6 @@ export default function Layout() {
             </AdministratorContext.Provider>
           )}
         </main>
-        <footer className="app-footer">
-          <span>Hikari · Вместе интереснее</span>
-          <span>Первая браузерная версия</span>
-        </footer>
       </div>
     </div>
   )

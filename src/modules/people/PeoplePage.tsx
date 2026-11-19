@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import type { Person } from '../../shared/api'
 import { PageHeader, SearchInput, SelectFilter, booleanOptions } from '../../shared/components'
 import { DataTable, useList } from '../../shared/table'
+import { TelegramLink, TelegramMentions } from '../../shared/TelegramLink'
 import { date, yesNo } from '../../shared/format'
 
 export default function PeoplePage() {
@@ -13,6 +14,7 @@ export default function PeoplePage() {
     'is_itmo_student',
   ])
   const columns: ColumnDef<Person, unknown>[] = [
+    { accessorKey: 'id', header: 'ID', enableSorting: false },
     {
       id: 'name',
       accessorFn: (p) => p.full_name || p.display_name,
@@ -22,8 +24,16 @@ export default function PeoplePage() {
         <div className="person-cell">
           <span className="avatar">{(p.full_name || p.display_name).slice(0, 1)}</span>
           <div>
-            <strong>{p.full_name || p.display_name}</strong>
-            <small>{p.username ? '@' + p.username : 'Telegram ID ' + p.telegram_user_id}</small>
+            <strong>
+              <TelegramMentions text={p.full_name || p.display_name} />
+            </strong>
+            <small>
+              {p.username ? (
+                <TelegramLink username={p.username} id={p.telegram_user_id} />
+              ) : (
+                'Telegram ID ' + p.telegram_user_id
+              )}
+            </small>
           </div>
         </div>
       ),
@@ -68,12 +78,12 @@ export default function PeoplePage() {
   ]
   return (
     <>
-      <PageHeader title="Участники" description="Люди, которые делают наш клуб." />
+      <PageHeader title="Участники" />
       <div className="toolbar">
         <SearchInput
           value={list.params.get('search') || ''}
           onChange={(v) => list.set('search', v)}
-          placeholder="Имя или Telegram"
+          placeholder="Имя, @username или ID"
         />
         <SelectFilter
           label="Студент ИТМО"

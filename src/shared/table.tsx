@@ -1,4 +1,14 @@
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useCallback,
+  type ReactNode,
+  type PointerEvent,
+} from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -14,13 +24,176 @@ import {
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
+  GripVertical,
   SlidersHorizontal,
 } from 'lucide-react'
 import { api, type Page } from './api'
 import { positiveInteger } from './format'
 import { ErrorState } from './components'
+import './column-drag.css'
 
 export const AdministratorContext = createContext(0)
+
+function ColumnMenu({ children }: { children: ReactNode }) {
+  const [open, setOpen] = useState(false)
+  const menu = useRef<HTMLDetailsElement>(null)
+  const panel = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const container = menu.current
+    const popup = panel.current
+    const table = container?.closest('.table-section')?.querySelector('.table-scroll')
+    if (!open || !container || !popup || !table) return
+    const viewport = window.visualViewport
+    const position = () => {
+      const anchor = container.getBoundingClientRect()
+      const top = viewport?.offsetTop ?? 0
+      const bottom = top + (viewport?.height ?? window.innerHeight)
+      const below = Math.min(table.getBoundingClientRect().bottom, bottom) - anchor.bottom
+      const above = anchor.top - top
+      const upward = below < popup.scrollHeight + 2 && above > below
+      popup.dataset.side = upward ? 'above' : 'below'
+      popup.style.maxHeight = Math.max(0, Math.floor(upward ? above : below)) + 'px'
+    }
+    const outside = (event: Event) => {
+      if (event.target instanceof Node && !container.contains(event.target)) setOpen(false)
+    }
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setOpen(false)
+      container.querySelector('summary')?.focus({ preventScroll: true })
+    }
+    position()
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(position) : null
+    observer?.observe(table)
+    document.addEventListener('pointerdown', outside, true)
+    document.addEventListener('focusin', outside)
+    document.addEventListener('keydown', escape)
+    window.addEventListener('resize', position)
+    window.addEventListener('scroll', position, true)
+    viewport?.addEventListener('resize', position)
+    viewport?.addEventListener('scroll', position)
+    return () => {
+      observer?.disconnect()
+      document.removeEventListener('pointerdown', outside, true)
+      document.removeEventListener('focusin', outside)
+      document.removeEventListener('keydown', escape)
+      window.removeEventListener('resize', position)
+      window.removeEventListener('scroll', position, true)
+      viewport?.removeEventListener('resize', position)
+      viewport?.removeEventListener('scroll', position)
+    }
+  }, [open])
+  return (
+    <details className="columns-menu" ref={menu} open={open}>
+      <summary
+        onClick={(event) => {
+          event.preventDefault()
+          setOpen(!open)
+        }}
+      >
+        <SlidersHorizontal size={16} />
+        Колонки
+      </summary>
+      {open && (
+        <div ref={panel} className="columns-popover" data-column-zone>
+          {children}
+        </div>
+      )}
+    </details>
+  )
+}
+
+function ColumnHandle({
+  id,
+  label,
+  items,
+  move,
+}: {
+  id: string
+  label: string
+  items: string[]
+  move: (from: string, to: string) => void
+}) {
+  const pointer = useRef<number | null>(null)
+  const highlight = useRef<HTMLElement | null>(null)
+  const frame = useRef<number | null>(null)
+  const stopScroll = () => {
+    if (frame.current !== null) cancelAnimationFrame(frame.current)
+    frame.current = null
+  }
+  const clear = () => {
+    stopScroll()
+    highlight.current?.removeAttribute('data-drop-target')
+    highlight.current = null
+    pointer.current = null
+  }
+  useEffect(() => clear, [])
+  const targetAt = (zone: Element | null, x: number, y: number) => {
+    const cell = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-column-id]')
+    return cell?.closest('[data-column-zone]') === zone ? cell : null
+  }
+  const showTarget = (cell: HTMLElement | null | undefined) => {
+    highlight.current?.removeAttribute('data-drop-target')
+    highlight.current = cell ?? null
+    if (cell && cell.dataset.columnId !== id) cell.setAttribute('data-drop-target', '')
+  }
+  const drag = (e: PointerEvent<HTMLButtonElement>) => {
+    stopScroll()
+    const zone = e.currentTarget.closest<HTMLElement>('[data-column-zone]')
+    if (!zone) return
+    const { clientX: x, clientY: y } = e
+    showTarget(targetAt(zone, x, y))
+    const rect = zone.getBoundingClientRect()
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return
+    const edge = Math.min(36, rect.height / 4)
+    const step = y < rect.top + edge ? -8 : y > rect.bottom - edge ? 8 : 0
+    if (!step || zone.scrollHeight <= zone.clientHeight) return
+    const tick = () => {
+      frame.current = null
+      const previous = zone.scrollTop
+      zone.scrollTop = Math.max(0, Math.min(zone.scrollHeight - zone.clientHeight, previous + step))
+      if (previous === zone.scrollTop) return
+      showTarget(targetAt(zone, x, y))
+      frame.current = requestAnimationFrame(tick)
+    }
+    frame.current = requestAnimationFrame(tick)
+  }
+  return (
+    <button
+      type="button"
+      className="column-grip"
+      aria-label={'Переместить колонку ' + label}
+      aria-keyshortcuts="ArrowUp ArrowDown"
+      onPointerDown={(e) => {
+        if (!e.isPrimary || e.button !== 0) return
+        e.preventDefault()
+        e.currentTarget.setPointerCapture(e.pointerId)
+        pointer.current = e.pointerId
+      }}
+      onPointerMove={(e) => {
+        if (pointer.current !== e.pointerId) return
+        drag(e)
+      }}
+      onPointerUp={(e) => {
+        if (pointer.current !== e.pointerId) return
+        const zone = e.currentTarget.closest('[data-column-zone]')
+        const destination = targetAt(zone, e.clientX, e.clientY)?.dataset.columnId
+        clear()
+        if (destination && destination !== id) move(id, destination)
+      }}
+      onPointerCancel={clear}
+      onLostPointerCapture={clear}
+      onKeyDown={(e) => {
+        if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+        e.preventDefault()
+        const destination = items[items.indexOf(id) + (e.key === 'ArrowUp' ? -1 : 1)]
+        if (destination) move(id, destination)
+      }}
+    >
+      <GripVertical size={16} aria-hidden="true" />
+    </button>
+  )
+}
 export function useList<T>(
   endpoint: string,
   defaults: { sort: string; order?: string },
@@ -170,69 +343,70 @@ export function DataTable<T>({
           {list.query.isPending ? 'Загрузка…' : 'Найдено: ' + (meta?.total_items ?? 0)}
           {list.query.isFetching && !list.query.isPending && ' · обновление'}
         </span>
-        <details className="columns-menu">
-          <summary>
-            <SlidersHorizontal size={16} />
-            Колонки
-          </summary>
-          <div className="columns-popover">
-            {columnSettings}
-            {table.getAllLeafColumns().map((c, index, all) => (
-              <div
-                className="column-option"
-                key={c.id}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData('text/plain', c.id)
-                  setDragged(c.id)
-                }}
-                onDragEnd={() => setDragged(null)}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault()
-                  if (dragged) move(dragged, c.id)
-                  setDragged(null)
-                }}
-              >
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={c.getIsVisible()}
-                    disabled={!c.getCanHide()}
-                    onChange={c.getToggleVisibilityHandler()}
-                  />
-                  {String(c.columnDef.header)}
-                </label>
-                <button
-                  className="icon-button"
-                  aria-label={'Поднять колонку ' + c.columnDef.header}
-                  disabled={index === 0}
-                  onClick={() => move(c.id, all[index - 1].id)}
-                >
-                  <ArrowUp size={14} />
-                </button>
-                <button
-                  className="icon-button"
-                  aria-label={'Опустить колонку ' + c.columnDef.header}
-                  disabled={index === all.length - 1}
-                  onClick={() => move(c.id, all[index + 1].id)}
-                >
-                  <ArrowDown size={14} />
-                </button>
-              </div>
-            ))}
-            <button
-              className="text-button"
-              onClick={() => {
-                setOrder([])
-                setVisibility({})
-                onResetColumns?.()
+        <ColumnMenu>
+          {columnSettings}
+          {table.getAllLeafColumns().map((c, index, all) => (
+            <div
+              className="column-option"
+              data-column-id={c.id}
+              key={c.id}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData('text/plain', c.id)
+                setDragged(c.id)
+              }}
+              onDragEnd={() => setDragged(null)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault()
+                if (dragged) move(dragged, c.id)
+                setDragged(null)
               }}
             >
-              Сбросить колонки
-            </button>
-          </div>
-        </details>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={c.getIsVisible()}
+                  disabled={!c.getCanHide()}
+                  onChange={c.getToggleVisibilityHandler()}
+                />
+                {String(c.columnDef.header)}
+              </label>
+              <ColumnHandle
+                id={c.id}
+                label={String(c.columnDef.header)}
+                items={normalizedOrder}
+                move={move}
+              />
+              <button
+                className="icon-button"
+                aria-label={'Поднять колонку ' + c.columnDef.header}
+                disabled={index === 0}
+                onClick={() => move(c.id, all[index - 1].id)}
+              >
+                <ArrowUp size={14} />
+              </button>
+              <button
+                className="icon-button"
+                aria-label={'Опустить колонку ' + c.columnDef.header}
+                disabled={index === all.length - 1}
+                onClick={() => move(c.id, all[index + 1].id)}
+              >
+                <ArrowDown size={14} />
+              </button>
+            </div>
+          ))}
+          <button
+            className="text-button"
+            onClick={() => {
+              setOrder([])
+              setVisibility({})
+              onResetColumns?.()
+            }}
+          >
+            Сбросить колонки
+          </button>
+        </ColumnMenu>
       </div>
       <div
         className="table-scroll"
@@ -247,18 +421,6 @@ export function DataTable<T>({
                 {group.headers.map((header) => (
                   <th
                     key={header.id}
-                    draggable
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData('text/plain', header.column.id)
-                      setDragged(header.column.id)
-                    }}
-                    onDragEnd={() => setDragged(null)}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => {
-                      e.preventDefault()
-                      if (dragged) move(dragged, header.column.id)
-                      setDragged(null)
-                    }}
                     aria-sort={
                       list.sort === header.column.id
                         ? list.order === 'asc'

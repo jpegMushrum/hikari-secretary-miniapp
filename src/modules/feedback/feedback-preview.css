@@ -1,0 +1,17 @@
+.feedback-preview-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.feedback-open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.feedback-preview .text-link {
+  position: relative;
+  z-index: 1;
+}

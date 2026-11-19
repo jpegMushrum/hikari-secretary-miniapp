@@ -22,6 +22,7 @@ export default function EventsPage() {
     'starts_to',
   ])
   const columns: ColumnDef<WorkspaceItem, unknown>[] = [
+    { accessorKey: 'id', header: 'ID', enableSorting: false },
     {
       accessorKey: 'title',
       header: 'Мероприятие',
@@ -74,7 +75,6 @@ export default function EventsPage() {
     <>
       <PageHeader
         title="Мероприятия"
-        description="Встречи, разговоры и новые знакомства."
         action={
           <Link className="button primary" to="/admin/events/new">
             <Plus size={18} />
@@ -100,7 +100,7 @@ export default function EventsPage() {
       </div>
       <div className="toolbar">
         <SearchInput
-          placeholder="Найти мероприятие"
+          placeholder="Название или ID мероприятия"
           value={list.params.get('search') || ''}
           onChange={(v) => list.set('search', v)}
         />

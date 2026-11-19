@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import PeoplePage from './people/PeoplePage'
+import FeedbackPage from './feedback/FeedbackPage'
 import PublicationDetail from './publications/PublicationDetail'
 import EventDetail from './events/EventDetail'
 import EventsPage from './events/EventsPage'
@@ -35,6 +36,19 @@ function mount(element: React.ReactNode, route = '/') {
 const json = (value: unknown, status = 200) =>
   new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json' } })
 
+it('searches feedback for zero without forwarding a stale zero ID filter', async () => {
+  const fetcher = vi.fn(async (_input: string) =>
+    json({ items: [], page: { number: 1, size: 10, total_items: 0, total_pages: 0 } }),
+  )
+  vi.stubGlobal('fetch', fetcher)
+  mount(<FeedbackPage />, '/admin/feedback?author_id=0&event_id=042')
+  await userEvent.setup().type(screen.getByRole('textbox'), '0')
+  await waitFor(() => expect(fetcher.mock.calls.at(-1)?.[0]).toContain('search=0'))
+  const url = new URL(fetcher.mock.calls.at(-1)![0], 'http://localhost')
+  expect(url.searchParams.has('author_id')).toBe(false)
+  expect(url.searchParams.get('event_id')).toBe('042')
+})
+
 it('people table sends server sorting/filtering/pagination and persists column choices', async () => {
   const user = userEvent.setup()
   const fetcher = vi.fn(async (_input: string, _options?: RequestInit) =>
@@ -59,6 +73,7 @@ it('people table sends server sorting/filtering/pagination and persists column c
   vi.stubGlobal('fetch', fetcher)
   mount(<PeoplePage />, '/admin/people?page=2&search=Анна')
   await screen.findByText('Анна Соколова')
+  expect(screen.getByRole('link', { name: '@demo' }).getAttribute('href')).toBe('https://t.me/demo')
   expect(fetcher.mock.calls[0][0]).toContain('page=2')
   await user.click(screen.getByRole('button', { name: 'Посещения' }))
   await waitFor(() => expect(fetcher.mock.calls.at(-1)?.[0]).toContain('sort=visits'))
@@ -69,17 +84,19 @@ it('people table sends server sorting/filtering/pagination and persists column c
   await user.click(screen.getByRole('button', { name: 'Следующая страница' }))
   await waitFor(() => expect(fetcher.mock.calls.at(-1)?.[0]).toContain('page=2'))
   await user.click(screen.getByText('Колонки'))
+  await user.click(screen.getByRole('checkbox', { name: 'ID' }))
+  expect(screen.queryByRole('columnheader', { name: 'ID' })).toBeNull()
   await user.click(screen.getByRole('checkbox', { name: 'ИТМО' }))
   expect(
     JSON.parse(localStorage.getItem('hikari.columns.0.Участники') || '{}').is_itmo_student,
   ).toBe(false)
   await user.click(screen.getByRole('button', { name: 'Поднять колонку Посещения' }))
   expect(screen.getAllByRole('columnheader')[0].textContent).toContain('Посещения')
-  expect(JSON.parse(localStorage.getItem('hikari.columns.0.Участники.order') || '[]')[0]).toBe(
+  expect(JSON.parse(localStorage.getItem('hikari.columns.0.Участники.order') || '[]')[1]).toBe(
     'visits',
   )
   await user.click(screen.getByRole('button', { name: 'Сбросить колонки' }))
-  expect(screen.getAllByRole('columnheader')[0].textContent).toContain('Участник')
+  expect(screen.getAllByRole('columnheader')[0].textContent).toBe('ID')
 })
 
 it('configures a bot draft without sending original content back, then schedules it', async () => {
@@ -186,9 +203,10 @@ it('shows drafts in all meetings and filters them through the workspace endpoint
   )
   vi.stubGlobal('fetch', fetcher)
   mount(<EventsPage />, '/admin/events')
-  expect((await screen.findByRole('link', { name: 'Новый анонс' })).getAttribute('href')).toBe(
-    '/admin/publications/4',
-  )
+  const draftLink = await screen.findByRole('link', { name: /Новый анонс/ })
+  expect(draftLink.getAttribute('href')).toBe('/admin/publications/4')
+  expect(draftLink.textContent).toBe('Новый анонс')
+  expect(screen.getByRole('cell', { name: '4' })).toBeTruthy()
   expect(screen.getByText('Не задана')).toBeTruthy()
   await user.click(screen.getByRole('button', { name: 'Черновики' }))
   await waitFor(() =>
@@ -212,9 +230,22 @@ it('toggles participant column detail and preserves unknown pass data', async ()
                   full_name: 'Участник проверки',
                   status: 'registered',
                   registered_at: '2026-11-17T10:00:00Z',
+                  cancelled_at: null,
                   attended: null,
                   needs_pass: true,
                   is_russian_citizen: null,
+                  is_itmo_student: true,
+                },
+                {
+                  person_id: 42,
+                  telegram_user_id: 456,
+                  full_name: 'Отменивший участник',
+                  status: 'cancelled',
+                  registered_at: '2026-11-18T11:00:00Z',
+                  cancelled_at: '2026-11-18T12:30:00Z',
+                  attended: null,
+                  needs_pass: false,
+                  is_russian_citizen: true,
                   is_itmo_student: true,
                 },
               ],
@@ -236,6 +267,14 @@ it('toggles participant column detail and preserves unknown pass data', async ()
   )
   mount(<EventDetail />)
   await screen.findByText('Участник проверки')
+  expect(screen.getByRole('cell', { name: '42' })).toBeTruthy()
+  expect(screen.getByRole('cell', { name: 'Регистрация отменена' })).toBeTruthy()
+  expect(screen.getByRole('columnheader', { name: 'Время регистрации' })).toBeTruthy()
+  expect(screen.getByRole('columnheader', { name: 'Время отмены' })).toBeTruthy()
+  expect(screen.getByRole('cell', { name: /14:00/ })).toBeTruthy()
+  expect(screen.getByRole('cell', { name: /15:30/ })).toBeTruthy()
+  expect(screen.getByRole('cell', { name: 'Не нужен' })).toBeTruthy()
+  expect(screen.getByRole('option', { name: 'Нужен' })).toBeTruthy()
   expect(screen.getByText('Уточнить данные')).toBeTruthy()
   await user.click(screen.getByText('Колонки'))
   await user.click(screen.getByRole('checkbox', { name: 'Статус — только индикатор' }))

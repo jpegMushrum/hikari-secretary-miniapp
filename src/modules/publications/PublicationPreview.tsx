@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { apiBlob, type Publication, type MessageEntity } from '../../shared/api'
+import { TelegramMentions } from '../../shared/TelegramLink'
 
 export function safeLink(raw: unknown): string | undefined {
   if (typeof raw !== 'string') return
@@ -30,6 +31,7 @@ export function EntityText({
   const cuts = [
     ...new Set([0, text.length, ...valid.flatMap((e) => [e.offset, e.offset + e.length])]),
   ].sort((a, b) => a - b)
+  if (valid.length === 0) return <TelegramMentions text={text} />
   return (
     <>
       {cuts.slice(0, -1).map((start, i) => {
@@ -124,14 +126,18 @@ function PreviewImage({ publicationId, position }: { publicationId: number; posi
   )
 }
 
-function richText(value: unknown, depth = 0): ReactNode {
+function richText(value: unknown, depth = 0, allowMentions = true): ReactNode {
   if (depth > 20) return null
-  if (typeof value === 'string') return value
+  if (typeof value === 'string') return allowMentions ? <TelegramMentions text={value} /> : value
   if (Array.isArray(value))
-    return value.map((v, i) => <span key={i}>{richText(v, depth + 1)}</span>)
+    return value.map((v, i) => <span key={i}>{richText(v, depth + 1, allowMentions)}</span>)
   if (!value || typeof value !== 'object') return null
   const n = value as Record<string, unknown>,
-    inner = richText(n.text ?? n.items ?? n.alternative_text ?? n.expression, depth + 1)
+    inner = richText(
+      n.text ?? n.items ?? n.alternative_text ?? n.expression,
+      depth + 1,
+      allowMentions && !['link', 'url', 'code', 'monospace'].includes(String(n.type)),
+    )
   switch (n.type) {
     case 'bold':
       return <strong>{inner}</strong>
@@ -179,7 +185,7 @@ export function PublicationPreview({ publication }: { publication: Publication }
     return values.map((value, index) => {
       if (!value || typeof value !== 'object') return null
       const b = value as Record<string, unknown>,
-        text = richText(b.text),
+        text = richText(b.text, 0, b.type !== 'pre'),
         children = () => blocks(b.blocks, depth + 1)
       switch (b.type) {
         case 'heading':
@@ -301,7 +307,7 @@ export function PublicationPreview({ publication }: { publication: Publication }
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      {richText(button.text)}
+                      {richText(button.text, 0, false)}
                     </a>
                   ) : (
                     <span key={i}>{richText(button.text)}</span>

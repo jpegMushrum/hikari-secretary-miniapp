@@ -15,6 +15,7 @@ export default function PublicationsPage() {
   const location = useLocation(),
     list = useList<Item>('/publications', { sort: 'created_at', order: 'desc' }, ['status'])
   const columns: ColumnDef<Item, unknown>[] = [
+    { accessorKey: 'id', header: 'ID', enableSorting: false },
     {
       id: 'text',
       accessorKey: 'text',
