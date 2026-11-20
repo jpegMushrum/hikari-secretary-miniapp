@@ -159,5 +159,6 @@ export type AIJob = {
   attempts: number
   last_error: string | null
   publication_id: number | null
+  publication_status: string | null
   topic: Record<string, unknown> | null
 }

@@ -1,11 +1,15 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link, useLocation } from 'react-router-dom'
 import type { ColumnDef } from '@tanstack/react-table'
 import { api, type AISettings, type AIJob } from '../../shared/api'
-import { PageHeader, ErrorState, Loading, Status, SelectFilter } from '../../shared/components'
+import { PageHeader, ErrorState, Loading, SelectFilter } from '../../shared/components'
 import { DataTable, useList } from '../../shared/table'
 import { dateTime } from '../../shared/format'
+import { GenerationStatus, PublicationStatus, topicTitle } from './AIJobStatus'
+
 export default function AIPage() {
+  const location = useLocation()
   const client = useQueryClient()
   const settings = useQuery({
     queryKey: ['ai-settings'],
@@ -13,8 +17,7 @@ export default function AIPage() {
   })
   const [level, setLevel] = useState('N3'),
     [comment, setComment] = useState(''),
-    [saved, setSaved] = useState(false),
-    [detail, setDetail] = useState<AIJob | null>(null)
+    [saved, setSaved] = useState(false)
   useEffect(() => {
     if (settings.data) {
       setLevel(settings.data.jlpt_level)
@@ -33,33 +36,33 @@ export default function AIPage() {
     },
   })
   const list = useList<AIJob>('/ai/history', { sort: 'scheduled_for', order: 'desc' }, ['status'])
-  const title = (job: AIJob) => {
-    const t = job.topic
-    return String(t?.title_ru || t?.title || t?.theme || t?.topic || 'Материал #' + job.id)
-  }
   const columns: ColumnDef<AIJob, unknown>[] = [
     { accessorKey: 'id', header: 'ID' },
     {
       id: 'title',
       header: 'Тема',
       enableHiding: false,
-      accessorFn: title,
+      accessorFn: topicTitle,
       cell: ({ row }) => (
-        <button className="text-link" onClick={() => setDetail(row.original)}>
-          {title(row.original)}
-        </button>
+        <Link
+          className="text-link"
+          to={'/admin/ai/history/' + row.original.id}
+          state={{ from: location.pathname + location.search }}
+        >
+          {topicTitle(row.original)}
+        </Link>
       ),
     },
     { accessorKey: 'scheduled_for', header: 'Дата', cell: (i) => dateTime(i.getValue() as string) },
     {
       accessorKey: 'status',
-      header: 'Статус',
-      cell: (i) => (
-        <Status
-          value={i.getValue() as string}
-          label={i.getValue() === 'scheduled' ? 'Подготовлено' : undefined}
-        />
-      ),
+      header: 'Генерация',
+      cell: ({ row }) => <GenerationStatus job={row.original} />,
+    },
+    {
+      accessorKey: 'publication_status',
+      header: 'Публикация',
+      cell: ({ row }) => <PublicationStatus job={row.original} />,
     },
     { accessorKey: 'attempts', header: 'Попытки' },
   ]
@@ -127,7 +130,7 @@ export default function AIPage() {
       <div className="section-heading">
         <h2>История тем</h2>
         <SelectFilter
-          label="Статус"
+          label="Статус генерации"
           options={[
             ['', 'Все'],
             ['scheduled', 'Подготовлено'],
@@ -142,67 +145,6 @@ export default function AIPage() {
         />
       </div>
       <DataTable name="История тем" columns={columns} list={list} />
-      {detail && (
-        <section className="topic-detail">
-          <div className="section-heading">
-            <h2>{title(detail)}</h2>
-            <button className="text-button" onClick={() => setDetail(null)}>
-              Закрыть
-            </button>
-          </div>
-          {detail.last_error && <p className="notice error">{detail.last_error}</p>}
-          <Topic value={detail.topic} />
-        </section>
-      )}
     </>
   )
-}
-function Topic({ value }: { value: unknown }) {
-  if (value == null) return <p className="muted">Материал ещё не сформирован.</p>
-  if (typeof value === 'string' || typeof value === 'number')
-    return <p className="prose">{String(value)}</p>
-  if (Array.isArray(value))
-    return (
-      <ul className="topic-list">
-        {value.map((v, i) => (
-          <li key={i}>
-            <Topic value={v} />
-          </li>
-        ))}
-      </ul>
-    )
-  if (typeof value === 'object')
-    return (
-      <dl className="topic-fields">
-        {Object.entries(value).map(([k, v]) => (
-          <div key={k}>
-            <dt>
-              {(
-                {
-                  title: 'Тема',
-                  title_ru: 'Тема',
-                  questions: 'Вопросы',
-                  vocabulary: 'Лексика',
-                  grammar: 'Грамматика',
-                  vocabulary_theme: 'Тема лексики',
-                  introduction: 'Вступление',
-                  japanese: 'Японский',
-                  reading: 'Чтение',
-                  pattern: 'Конструкция',
-                  explanation: 'Объяснение',
-                  example: 'Пример',
-                  jlpt_level: 'Уровень',
-                  translation: 'Перевод',
-                  text: 'Текст',
-                } as Record<string, string>
-              )[k] || k}
-            </dt>
-            <dd>
-              <Topic value={v} />
-            </dd>
-          </div>
-        ))}
-      </dl>
-    )
-  return null
 }

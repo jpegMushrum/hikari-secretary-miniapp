@@ -10,6 +10,7 @@ import {
   PublicationsPage,
   PublicationDetail,
   FeedbackDetail,
+  AIJobDetail,
 } from './app/modules'
 import { ApiError } from './shared/api'
 import './styles.css'
@@ -46,6 +47,7 @@ function start() {
                 <Route path="/admin/events/drafts" element={<PublicationsPage />} />
                 <Route path="/admin/publications/:id" element={<PublicationDetail />} />
                 <Route path="/admin/events/:id" element={<EventDetail />} />
+                <Route path="/admin/ai/history/:id" element={<AIJobDetail />} />
                 <Route path="/admin/feedback/:id" element={<FeedbackDetail />} />
                 <Route
                   path="*"

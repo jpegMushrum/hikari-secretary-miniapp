@@ -236,7 +236,9 @@ export default function EventDetail() {
           {publish.error && <ErrorState error={publish.error} />}
         </details>
       )}
-      <h2>Участники встречи</h2>
+      <div className="section-heading">
+        <h2>Участники встречи</h2>
+      </div>
       <div className="toolbar">
         <SelectFilter
           label="Нужен пропуск"

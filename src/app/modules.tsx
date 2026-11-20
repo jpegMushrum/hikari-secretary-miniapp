@@ -33,6 +33,7 @@ export const modules = [
     component: lazy(() => import('../modules/feedback/FeedbackPage')),
   },
 ]
+export const AIJobDetail = lazy(() => import('../modules/ai/AIJobDetail'))
 export const EventDetail = lazy(() => import('../modules/events/EventDetail'))
 export const PublicationsPage = lazy(() => import('../modules/publications/PublicationsPage'))
 export const PublicationDetail = lazy(() => import('../modules/publications/PublicationDetail'))

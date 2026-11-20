@@ -21,6 +21,9 @@ export default function Layout() {
     menuButton = useRef<HTMLButtonElement>(null)
   const location = useLocation(),
     navigate = useNavigate()
+  const current = modules.find((m) =>
+    (m.roots || [m.path]).some((path) => location.pathname.startsWith(path)),
+  )
   const me = useQuery({
     queryKey: ['me'],
     queryFn: ({ signal }) => api<Administrator>('/me', { signal }),
@@ -52,13 +55,16 @@ export default function Layout() {
     const tg = window.Telegram?.WebApp
     tg?.ready?.()
     tg?.expand?.()
-    const back = () => navigate(-1)
+    const back = () => {
+      if (window.history.state?.idx > 0) navigate(-1)
+      else navigate(current?.path ?? '/admin', { replace: true })
+    }
     if (location.pathname.split('/').length > 3) {
       tg?.BackButton?.show()
       tg?.BackButton?.onClick(back)
     } else tg?.BackButton?.hide()
     return () => tg?.BackButton?.offClick(back)
-  }, [location.pathname, navigate])
+  }, [location.pathname, navigate, current])
   useEffect(() => {
     if (!open) return
     document.body.style.overflow = 'hidden'
@@ -88,9 +94,6 @@ export default function Layout() {
       document.removeEventListener('keydown', key)
     }
   }, [open])
-  const current = modules.find((m) =>
-    (m.roots || [m.path]).some((path) => location.pathname.startsWith(path)),
-  )
   return (
     <div className="app-shell">
       <a href="#main-content" className="skip-link">
