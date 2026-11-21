@@ -981,14 +981,29 @@ legend {
   border-top: 1px solid var(--line);
   margin-top: 30px;
 }
+.topic-versions {
+  display: grid;
+  gap: 8px;
+  max-width: 32rem;
+  margin: 16px 0;
+}
+.topic-versions .text-button {
+  justify-self: start;
+}
 .topic-meta {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
   align-items: baseline;
-  gap: 6px 16px;
-  margin-top: 12px;
-  color: var(--muted);
+  gap: 4px 12px;
+  margin: 12px 0 0;
   font-size: 13px;
+  line-height: 1.4;
+}
+.topic-meta dt {
+  color: var(--muted);
+}
+.topic-meta dd {
+  margin: 0;
 }
 .topic-section {
   margin-top: 20px;

@@ -172,13 +172,15 @@ it('configures a bot draft without sending original content back, then schedules
 it('AI settings remain editable without a provider key', async () => {
   const user = userEvent.setup()
   const fetcher = vi.fn(async (input: string, options?: RequestInit) =>
-    input.includes('/history')
-      ? json({ items: [], page: { number: 1, size: 10, total_items: 0, total_pages: 0 } })
-      : json({
-          jlpt_level: options?.method === 'PUT' ? 'N4' : 'N3',
-          admin_comment: null,
-          enabled: false,
-        }),
+    input.endsWith('/history/latest')
+      ? new Response(null, { status: 204 })
+      : input.includes('/history')
+        ? json({ items: [], page: { number: 1, size: 10, total_items: 0, total_pages: 0 } })
+        : json({
+            jlpt_level: options?.method === 'PUT' ? 'N4' : 'N3',
+            admin_comment: null,
+            enabled: false,
+          }),
   )
   vi.stubGlobal('fetch', fetcher)
   mount(<AIPage />)
@@ -211,6 +213,7 @@ it('distinguishes queued, delivered and historical AI publications and opens a d
     { ...job, id: 7, topic: null, publication_id: null, publication_status: null },
   ]
   const fetcher = vi.fn(async (url: string) => {
+    if (url.endsWith('/ai/history/latest')) return json(job)
     if (url.endsWith('/ai/history/5')) {
       job.publication_status = 'sent'
       return json(job)
@@ -268,11 +271,14 @@ it('distinguishes queued, delivered and historical AI publications and opens a d
   expect(screen.queryByRole('table')).toBeNull()
   expect(document.documentElement.scrollTop).toBe(0)
   expect(screen.getByText('Опубликовано')).toBeTruthy()
-  await user.click(screen.getByRole('button', { name: 'К истории тем' }))
+  await user.click(screen.getByRole('link', { name: 'На главную' }))
   await screen.findByRole('table')
   await waitFor(() => expect(screen.getAllByText('Опубликовано')).toHaveLength(2))
   expect(screen.queryByText('В очереди')).toBeNull()
-  const lastRequest = new URL(fetcher.mock.calls.at(-1)![0], 'http://localhost')
+  const lastRequest = new URL(
+    fetcher.mock.calls.filter(([url]) => url.includes('/history?')).at(-1)![0],
+    'http://localhost',
+  )
   expect(lastRequest.searchParams.get('status')).toBe('scheduled')
   expect(lastRequest.searchParams.get('sort')).toBe('publication_status')
 })
@@ -283,7 +289,188 @@ it('opens the AI detail directly and keeps navigation when the job cannot be fou
   mount(<AIPage />, '/admin/ai/history/100')
   await screen.findByRole('alert')
   expect(fetcher).toHaveBeenCalledTimes(1)
-  expect(screen.getByRole('link', { name: 'К истории тем' }).getAttribute('href')).toBe('/admin/ai')
+  expect(screen.getByRole('link', { name: 'На главную' }).getAttribute('href')).toBe('/admin/ai')
+})
+
+it('browses all AI material versions and restores the queued publication preview', async () => {
+  const user = userEvent.setup()
+  const job = {
+    id: 5, version_count: 11, publication_id: 19, publication_status: 'scheduled',
+    scheduled_for: '2026-11-20T09:00:00Z', status: 'scheduled', topic: { title: '秋' },
+  }
+  let failOlderPage = true
+  vi.stubGlobal('fetch', async (input: string) => {
+    const url = new URL(input, 'http://localhost')
+    if (url.pathname.endsWith('/versions')) {
+      expect(url.searchParams.get('page_size')).toBe('10')
+      const number = Number(url.searchParams.get('page'))
+      if (number === 2 && failOlderPage) return json({ error: 'server_error' }, 500)
+      const items = number === 1
+        ? Array.from({ length: 10 }, (_, i) => ({ version: 11 - i, topic: { title: 'Тема ' + (11 - i) } }))
+        : [{
+            version: 1, topic: {
+              title: '旅', questions: ['Где вы путешествовали?'], vocabulary_theme: 'Поездки',
+              vocabulary: [{ japanese: '切符', reading: 'きっぷ', translation: 'билет' }],
+              grammar: [{ pattern: '〜ながら', explanation: 'одновременность', example: '歩きながら話す', translation: 'Говорить на ходу' }],
+            },
+          }]
+      return json({ items, page: { number, size: 10, total_items: 11, total_pages: 2 } })
+    }
+    if (url.pathname.endsWith('/history/5')) return json(job)
+    if (url.pathname.endsWith('/publications/19')) return json({ id: 19, text: 'Текущая публикация', status: 'scheduled' })
+    throw new Error('unexpected request')
+  })
+  mount(<AIPage />, '/admin/ai/history/5')
+  await screen.findByText('Текущая публикация')
+  const picker = screen.getByRole('combobox', { name: 'Версия материала' })
+  await user.selectOptions(picker, '2')
+  await screen.findByRole('heading', { name: 'Тема 2' })
+  expect(screen.queryByText('Текущая публикация')).toBeNull()
+  await user.click(screen.getByRole('button', { name: 'Загрузить более ранние версии' }))
+  await screen.findByRole('alert')
+  expect(screen.getByRole('heading', { name: 'Тема 2' })).toBeTruthy()
+  failOlderPage = false
+  await user.click(screen.getByRole('button', { name: /повтор/i }))
+  await screen.findByRole('option', { name: '№1 · 旅' })
+  await user.selectOptions(picker, '1')
+  await screen.findByRole('heading', { name: '旅' })
+  expect(screen.getByText('Где вы путешествовали?')).toBeTruthy()
+  expect(screen.getByText('切符')).toBeTruthy()
+  expect(screen.getByText('〜ながら')).toBeTruthy()
+  await user.selectOptions(picker, '')
+  await screen.findByText('Текущая публикация')
+  expect(screen.queryByText('切符')).toBeNull()
+})
+
+const replacementLabel = 'Заменить последнюю генерацию'
+const emptyHistory = { items: [], page: { number: 1, size: 10, total_items: 0, total_pages: 0 } }
+
+it.each(['failed', 'scheduled'])(
+  'replaces the latest %s generation from the filtered AI page',
+  async (initial) => {
+    const user = userEvent.setup()
+    let status = initial
+    let finishRequest!: () => void
+    const pending = new Promise<void>((resolve) => {
+      finishRequest = resolve
+    })
+    const fetcher = vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.endsWith('/ai/settings')) return json({ enabled: true, jlpt_level: 'N3' })
+      if (url.includes('/ai/history?')) return json(emptyHistory)
+      if (url.endsWith('/ai/history/latest/regenerate') && options?.method === 'POST') {
+        await pending
+        status = 'pending'
+        return json({ accepted: true, id: 5 }, 202)
+      }
+      if (!url.endsWith('/ai/history/latest')) throw new Error('unexpected request')
+      return json({
+        id: 5,
+        status,
+        can_regenerate: status !== 'pending',
+        publication_status: status === 'scheduled' ? 'scheduled' : null,
+      })
+    })
+    vi.stubGlobal('fetch', fetcher)
+    mount(<AIPage />, '/admin/ai?status=cancelled&page=2')
+    const button = screen.getByRole('button', { name: replacementLabel }) as HTMLButtonElement
+    await waitFor(() => expect(button.disabled).toBe(false))
+    await user.dblClick(button)
+    expect(fetcher.mock.calls.filter(([, opts]) => opts?.method === 'POST')).toHaveLength(1)
+    expect(button.disabled).toBe(true)
+    finishRequest()
+    await screen.findByText('Генерация выполняется.')
+    expect(button.disabled).toBe(true)
+    const priorHistoryRequests = fetcher.mock.calls.filter(([url]) =>
+      url.includes('/history?'),
+    ).length
+    status = 'scheduled'
+    await screen.findByText('Новый материал поставлен в очередь.', {}, { timeout: 4500 })
+    expect(button.disabled).toBe(false)
+    await waitFor(() =>
+      expect(
+        fetcher.mock.calls.filter(([url]) => url.includes('/history?')).length,
+      ).toBeGreaterThan(priorHistoryRequests),
+    )
+  },
+  8000,
+)
+
+it('keeps the action visible and disabled when there are no generation jobs', async () => {
+  vi.stubGlobal('fetch', async (url: string) => {
+    if (url.endsWith('/latest')) return new Response(null, { status: 204 })
+    if (url.endsWith('/settings')) return json({ enabled: true, jlpt_level: 'N3' })
+    return json(emptyHistory)
+  })
+  mount(<AIPage />, '/admin/ai')
+  await screen.findByText('Заданий ИИ пока нет.')
+  expect(
+    (screen.getByRole('button', { name: replacementLabel }) as HTMLButtonElement).disabled,
+  ).toBe(true)
+})
+
+it.each([false, true])(
+  'refreshes history when an in-flight generation finishes (submitted here: %s)',
+  async (submittedHere) => {
+    let active = !submittedHere
+    let finished = false
+    const job = () => ({
+      id: 5,
+      attempts: 1,
+      scheduled_for: '2026-11-20T09:00:00Z',
+      status: finished ? 'scheduled' : active ? 'generating' : 'failed',
+      can_regenerate: !active || finished,
+      topic: finished ? { title: 'Новая тема' } : null,
+    })
+    vi.stubGlobal('fetch', async (url: string) => {
+      if (url.endsWith('/settings')) return json({ enabled: true, jlpt_level: 'N3' })
+      if (url.endsWith('/regenerate')) {
+        active = true
+        return json({ accepted: true, id: 5 }, 202)
+      }
+      if (url.endsWith('/latest') && active && submittedHere)
+        return json({ ...job(), id: 6, status: 'scheduled', publication_status: 'sent', can_regenerate: false })
+      if (url.endsWith('/latest') || url.endsWith('/history/5')) return json(job())
+      return json({ items: [job()], page: { number: 1, size: 10, total_items: 1, total_pages: 1 } })
+    })
+    mount(<AIPage />, '/admin/ai')
+    if (submittedHere) {
+      const button = screen.getByRole('button', { name: replacementLabel }) as HTMLButtonElement
+      await waitFor(() => expect(button.disabled).toBe(false))
+      await userEvent.setup().click(button)
+    }
+    await screen.findByText('Генерация выполняется.')
+    await screen.findByRole('link', { name: 'Материал #5' })
+    finished = true
+    await screen.findByRole('link', { name: 'Новая тема' }, { timeout: 4500 })
+    if (submittedHere) expect(screen.getByText('Новый материал поставлен в очередь.')).toBeTruthy()
+  },
+  8000,
+)
+
+it('refreshes the latest generation when delivery starts before replacement', async () => {
+  let sent = false
+  vi.stubGlobal('fetch', async (url: string) => {
+    if (url.endsWith('/regenerate')) {
+      sent = true
+      return json({ error: 'invalid_state' }, 409)
+    }
+    if (url.endsWith('/latest'))
+      return json({
+        id: 5,
+        status: 'scheduled',
+        can_regenerate: !sent,
+        publication_status: sent ? 'sent' : 'scheduled',
+      })
+    if (url.endsWith('/settings')) return json({ enabled: true, jlpt_level: 'N3' })
+    return json(emptyHistory)
+  })
+  mount(<AIPage />, '/admin/ai')
+  const button = screen.getByRole('button', { name: replacementLabel }) as HTMLButtonElement
+  await waitFor(() => expect(button.disabled).toBe(false))
+  await userEvent.setup().click(button)
+  expect((await screen.findByRole('alert')).textContent).toContain('Состояние задания изменилось')
+  await screen.findByText('Последнюю генерацию уже нельзя заменить.')
+  expect(button.disabled).toBe(true)
 })
 
 it('API forwards Telegram initData when present and reports denied access', async () => {

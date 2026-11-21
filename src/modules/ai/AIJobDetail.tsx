@@ -1,17 +1,15 @@
-import { useEffect } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { useLocation, useParams } from 'react-router-dom'
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { PublicationPreview } from '../publications/PublicationPreview'
-import { api, type AIJob, type Publication } from '../../shared/api'
-import { BackLink, ErrorState, Loading, PageHeader } from '../../shared/components'
+import { api, type AIJob, type AITopicVersion, type Page, type Publication } from '../../shared/api'
+import { BackLink, ErrorState, Loading, PageHeader, SelectFilter } from '../../shared/components'
 import { dateTime } from '../../shared/format'
-import { GenerationStatus, PublicationStatus, topicTitle } from './AIJobStatus'
+import { PublicationStatus, topicTitle } from './AIJobStatus'
 
 export default function AIJobDetail() {
   const { id } = useParams()
   const location = useLocation()
-  const navigate = useNavigate()
   const client = useQueryClient()
   const query = useQuery({
     queryKey: ['ai-job', id],
@@ -29,17 +27,17 @@ export default function AIJobDetail() {
   }, [id])
   const job = query.data
   useEffect(() => {
-    if (job) void client.invalidateQueries({ queryKey: ['/ai/history'] })
+    if (!job) return
+    void client.invalidateQueries({ queryKey: ['/ai/history'] })
+    if (job.status === 'scheduled' && job.publication_id != null) {
+      void client.invalidateQueries({ queryKey: ['publication', String(job.publication_id)] })
+      void client.invalidateQueries({ queryKey: ['/publications'] })
+      void client.invalidateQueries({ queryKey: ['/event-workspace'] })
+    }
   }, [client, job])
   return (
     <>
-      {location.state?.from ? (
-        <button type="button" className="text-button back-link" onClick={() => navigate(-1)}>
-          <ArrowLeft size={16} /> К истории тем
-        </button>
-      ) : (
-        <BackLink to="/admin/ai">К истории тем</BackLink>
-      )}
+      <BackLink to={location.state?.from || '/admin/ai'}>На главную</BackLink>
       {query.isPending ? (
         <Loading />
       ) : query.error ? (
@@ -48,34 +46,107 @@ export default function AIJobDetail() {
         job && (
           <>
             <PageHeader title="Предпросмотр публикации" />
-            <div className="topic-meta">
-              <span>
-                Генерация · <GenerationStatus job={job} />
-              </span>
-              <span>
-                Публикация · <PublicationStatus job={job} />
-              </span>
-              <span>По плану · {dateTime(job.scheduled_for)}</span>
-            </div>
+            <dl className="topic-meta">
+              <dt>Публикация</dt>
+              <dd><PublicationStatus job={job} /></dd>
+              <dt>По плану</dt>
+              <dd><time dateTime={job.scheduled_for}>{dateTime(job.scheduled_for)}</time></dd>
+            </dl>
             {job.last_error && <p className="notice error">{job.last_error}</p>}
-            <div className="topic-detail">
-              {job.publication_id != null ? (
-                <JobPublication id={job.publication_id} />
-              ) : job.topic ? (
-                <>
-                  <h2>Сохранённый материал</h2>
-                  <p>{topicTitle(job)}</p>
-                  {typeof job.topic.introduction === 'string' && <p>{job.topic.introduction}</p>}
-                  <Material job={job} />
-                </>
-              ) : (
-                <p className="muted">Материал ещё не сформирован.</p>
-              )}
-            </div>
+            <VersionedMaterial key={job.id} job={job} />
           </>
         )
       )}
     </>
+  )
+}
+
+function VersionedMaterial({ job }: { job: AIJob }) {
+  const [selected, setSelected] = useState<AITopicVersion | null>(null)
+  const topic = selected?.topic ?? job.topic
+  const title = topicTitle({ id: job.id, topic })
+  return (
+    <div className="topic-detail">
+      {job.version_count > 1 && (
+        <VersionPicker job={job} selected={selected} onSelect={setSelected} />
+      )}
+      {!selected && job.publication_id != null ? (
+        <JobPublication id={job.publication_id} />
+      ) : topic ? (
+        <>
+          <h2>{selected ? title : 'Сохранённый материал'}</h2>
+          {!selected && <p>{title}</p>}
+          {typeof topic.introduction === 'string' && <p>{topic.introduction}</p>}
+          <Material topic={topic} title={title} />
+        </>
+      ) : (
+        <p className="muted">Материал ещё не сформирован.</p>
+      )}
+    </div>
+  )
+}
+
+function VersionPicker({
+  job,
+  selected,
+  onSelect,
+}: {
+  job: AIJob
+  selected: AITopicVersion | null
+  onSelect: (version: AITopicVersion | null) => void
+}) {
+  const versions = useInfiniteQuery({
+    queryKey: ['ai-versions', job.id, job.version_count],
+    initialPageParam: 1,
+    queryFn: ({ pageParam, signal }) =>
+      api<Page<AITopicVersion>>(`/ai/history/${job.id}/versions?page=${pageParam}&page_size=10`, {
+        signal,
+      }),
+    getNextPageParam: ({ page }) => page.number < page.total_pages ? page.number + 1 : undefined,
+  })
+  const loaded = new Map<number, AITopicVersion>()
+  for (const page of versions.data?.pages ?? []) {
+    for (const item of page.items) {
+      if (item.version < job.version_count) loaded.set(item.version, item)
+    }
+  }
+  // Keep the selected archive visible if a new generation resets pagination.
+  if (selected) loaded.set(selected.version, selected)
+  const options: [string, string][] = [['', `№${job.version_count} · Текущая`]]
+  for (const item of loaded.values()) {
+    const title = topicTitle({ id: job.id, topic: item.topic })
+    options.push([String(item.version), `№${item.version} · ${title}`])
+  }
+  return (
+    <div className="topic-versions">
+      <SelectFilter
+        label="Версия материала"
+        value={String(selected?.version ?? '')}
+        options={options}
+        onChange={(value) => onSelect(loaded.get(Number(value)) ?? null)}
+      />
+      {versions.isPending && <Loading />}
+      {versions.error ? (
+        <ErrorState
+          error={versions.error}
+          retry={() => {
+            if (versions.isFetchNextPageError) void versions.fetchNextPage()
+            else void versions.refetch()
+          }}
+        />
+      ) : (
+        versions.hasNextPage && (
+          <button
+            type="button"
+            className="text-button"
+            disabled={versions.isFetchingNextPage}
+            onClick={() => void versions.fetchNextPage()}
+          >
+            {versions.isFetchingNextPage ? 'Загружаем…' : 'Загрузить более ранние версии'}
+          </button>
+        )
+      )}
+    </div>
   )
 }
 
@@ -91,8 +162,7 @@ function JobPublication({ id }: { id: number }) {
   return <PublicationPreview publication={publication.data} />
 }
 
-function Material({ job }: { job: AIJob }) {
-  const topic = job.topic
+function Material({ topic, title }: { topic: Record<string, unknown>; title: string }) {
   if (!topic || typeof topic !== 'object' || Array.isArray(topic)) return <Topic value={topic} />
 
   const sections = [
@@ -102,7 +172,7 @@ function Material({ job }: { job: AIJob }) {
   ] as const
   const shown = new Set<string>(sections.map(([key]) => key))
   for (const key of ['title_ru', 'title', 'theme', 'topic']) {
-    if (topic[key] === topicTitle(job)) shown.add(key)
+    if (topic[key] === title) shown.add(key)
   }
   if (typeof topic.introduction === 'string') shown.add('introduction')
   const hasVocabularyTheme = typeof topic.vocabulary_theme === 'string' && topic.vocabulary != null

@@ -152,8 +152,11 @@ export type MessageEntity = {
   user?: { id: number }
 }
 export type AISettings = { jlpt_level: string; admin_comment: string | null; enabled: boolean }
+export type AITopicVersion = { version: number; topic: Record<string, unknown> }
 export type AIJob = {
   id: number
+  version_count: number
+  can_regenerate: boolean
   scheduled_for: string
   status: string
   attempts: number

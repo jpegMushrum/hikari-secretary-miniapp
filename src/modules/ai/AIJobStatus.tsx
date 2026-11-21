@@ -1,7 +1,7 @@
 import type { AIJob } from '../../shared/api'
 import { Status } from '../../shared/components'
 
-export function topicTitle(job: AIJob) {
+export function topicTitle(job: Pick<AIJob, 'id' | 'topic'>) {
   const topic = job.topic
   return String(
     topic?.title || topic?.title_ru || topic?.theme || topic?.topic || 'Материал #' + job.id,
