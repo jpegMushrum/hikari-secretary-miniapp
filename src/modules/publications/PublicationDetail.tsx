@@ -272,7 +272,7 @@ function Settings({ publication: p }: { publication: Publication }) {
       )}
       {mutation.error && <ErrorState error={mutation.error} />}
       <p className="footnote">
-        Можно продолжить настройку этого же черновика обычными кнопками бота.
+        Чтобы настроить этот черновик в Telegram, нажмите «Остаться в чате» под сообщением бота.
       </p>
     </form>
   )

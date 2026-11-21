@@ -48,7 +48,7 @@ export default function PublicationsPage() {
       <BackLink to="/admin/events">Мероприятия</BackLink>
       <PageHeader
         title="Анонсы и черновики"
-        description="Отправьте или перешлите сообщение боту, затем продолжите здесь. Обычные кнопки бота остаются доступны."
+        description="Отправьте или перешлите анонс боту. В ответ он предложит открыть черновик здесь или продолжить в чате."
       />
       <div className="toolbar">
         <SelectFilter
