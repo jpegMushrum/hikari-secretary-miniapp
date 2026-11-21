@@ -178,6 +178,14 @@ function richText(value: unknown, depth = 0, allowMentions = true): ReactNode {
   }
 }
 
+function buttonLabel(value: unknown, depth = 0): string {
+  if (typeof value === 'string') return value
+  if (!value || typeof value !== 'object' || depth >= 20) return ''
+  if (Array.isArray(value)) return value.map(part => buttonLabel(part, depth + 1)).join('')
+  const node = value as Record<string, unknown>
+  return buttonLabel(node.text ?? node.items, depth + 1)
+}
+
 export function PublicationPreview({ publication }: { publication: Publication }) {
   let photo = 0
   const blocks = (values: unknown, depth = 0): ReactNode => {
@@ -292,29 +300,30 @@ export function PublicationPreview({ publication }: { publication: Publication }
             </figure>
           )
         }
-        case 'buttons':
+        case 'buttons': {
+          const buttons = Array.isArray(b.buttons)
+            ? b.buttons.filter(button => button && (
+                !publication.event || buttonLabel(button.text).trim().toLowerCase() !== 'зарегистрироваться'
+              ))
+            : []
+          if (!buttons.length) return null
           return (
-            <div className="button-row" key={index}>
-              {Array.isArray(b.buttons) &&
-                b.buttons.map((v, i) => {
-                  const button = v as Record<string, unknown>,
-                    href = safeLink(button.url)
-                  return href ? (
-                    <a
-                      key={i}
-                      className="button secondary"
-                      href={href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {richText(button.text, 0, false)}
-                    </a>
-                  ) : (
-                    <span key={i}>{richText(button.text)}</span>
-                  )
-                })}
+            <div className="preview-button-row" key={index}>
+              {buttons.map((v, i) => {
+                const button = v as Record<string, unknown>
+                const href = safeLink(button.url)
+                const className = button.style === 'success' ? 'button preview-success' : 'button secondary'
+                return href ? (
+                  <a key={i} className={className} href={href} target="_blank" rel="noopener noreferrer">
+                    {richText(button.text, 0, false)}
+                  </a>
+                ) : (
+                  <span key={i} className={className}>{richText(button.text)}</span>
+                )
+              })}
             </div>
           )
+        }
         default:
           return (
             <div key={index}>
@@ -343,7 +352,9 @@ export function PublicationPreview({ publication }: { publication: Publication }
         </>
       )}
       {publication.event && (
-        <span className="button secondary registration-preview">Зарегистрироваться</span>
+        <div className="preview-button-row">
+          <span className="button preview-success">Зарегистрироваться</span>
+        </div>
       )}
     </article>
   )

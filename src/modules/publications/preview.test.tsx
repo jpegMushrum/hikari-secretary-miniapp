@@ -4,6 +4,21 @@ import { EntityText, PublicationPreview, safeLink } from './PublicationPreview'
 import { TelegramLink } from '../../shared/TelegramLink'
 import type { Publication } from '../../shared/api'
 
+it('renders one green registration action for an event with an existing signup button', () => {
+  const publication = {
+    event: {},
+    rich_message: { blocks: [{ type: 'buttons', buttons: [
+      { text: 'Зарегистрироваться', style: 'success', url: 'https://t.me/club_bot?start=event_2' },
+      { text: 'Анонс', url: 'https://example.org/event' },
+    ] }] },
+  } as unknown as Publication
+  const html = renderToStaticMarkup(<PublicationPreview publication={publication} />)
+  expect(html.match(/Зарегистрироваться/g)).toHaveLength(1)
+  expect(html).toContain('button preview-success')
+  expect(html).toContain('https://example.org/event')
+  expect(html).not.toContain('start=event_2')
+})
+
 it('uses UTF-16 entity offsets and escapes HTML, rejecting script links', () => {
   const html = renderToStaticMarkup(
     <EntityText

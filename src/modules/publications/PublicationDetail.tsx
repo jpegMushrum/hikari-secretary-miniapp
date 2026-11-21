@@ -123,7 +123,7 @@ function Settings({ publication: p }: { publication: Publication }) {
   }
   if (p.status !== 'draft')
     return (
-      <section className="editor-form">
+      <section className="publication-dispatch">
         <h2>Отправка</h2>
         <p>
           <Status value={p.status} />

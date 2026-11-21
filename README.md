@@ -1,6 +1,6 @@
 # Hikari Mini App
 
-![Версия](https://img.shields.io/badge/version-v0.1.4-61DAFB)
+![Версия](https://img.shields.io/badge/version-v0.2.0-61DAFB)
 
 Административный интерфейс клуба: React + TypeScript + Vite, React Router,
 TanStack Query и TanStack Table. Тёмная тема по умолчанию, красный акцент,
@@ -14,9 +14,8 @@ TanStack Query и TanStack Table. Тёмная тема по умолчанию,
 ## Запуск в Docker
 
 В корне интеграционного репозитория подготовьте `targets.json` по
-`targets.example.json` и `.env` по `.env.example`. При первой инициализации
-локального тома задайте `LOCAL_DATABASE_NAME=hikari_dev`. Для полного стека
-укажите токен тестового бота и его `ADMIN_IDS`.
+`targets.example.json` и `.env` по `.env.example`. Для полного стека
+укажите в корневом `.env` токен тестового бота и его `ADMIN_IDS`.
 
 ```powershell
 docker compose -f docker-compose.bot-local.yml up -d --build
@@ -27,13 +26,10 @@ docker compose -f docker-compose.bot-local.yml up -d --build
 
 Открыть **http://localhost:5173**. Это самостоятельный локальный стек:
 PostgreSQL → миграции → Go API → gateway для браузерного входа → miniapp,
-а также настоящий тестовый бот из корневого `.env`.
-Имя проекта — `hikari-miniapp-dev`. База выбирается
-через `LOCAL_DATABASE_NAME` (по умолчанию существующая копия импорта
-`hikari_bot_local_20261117`). PostgreSQL создаёт базу `hikari_dev` при
-первой инициализации volume. Демоданные автоматически
-не создаются. Фоновые задачи бота включены и отправляют
-публикации в настроенные цели. Не используйте здесь production-токен.
+а также тестовый Telegram-бот. Имя проекта — `hikari-miniapp-dev`.
+PostgreSQL создаёт базу `hikari_dev` при инициализации тома. После применения
+миграций данные можно создавать через бота или miniapp. Фоновые задачи бота
+отправляют публикации в цели, заданные в корневом `targets.json`.
 
 ```powershell
 docker compose -f docker-compose.bot-local.yml ps
@@ -209,7 +205,7 @@ finally { Remove-Item Env:TEST_DATABASE_URL }
 Интеграционные тесты API и миграций используют временные схемы и сами
 применяют миграции. Учётная запись тестов должна иметь право CREATE SCHEMA.
 
-## Локальный стенд с тестовым ботом и импортированной базой
+## Локальный стенд с тестовым ботом
 
 Из корня интеграционного репозитория:
 
@@ -219,10 +215,7 @@ docker compose -f docker-compose.bot-local.yml up -d --build
 
 Compose использует токен тестового бота и `ADMIN_IDS` из корневого `.env`,
 а цели берёт из корневого `targets.json`. Бот и miniapp через backend работают
-с одной базой. Для проверки на импортированных данных создайте локальную
-копию PostgreSQL, восстановите её из дампа и укажите имя в `LOCAL_DATABASE_NAME`
-в корневом `.env`. Локальный Compose применяет миграции к выбранной базе.
-Перенос из SQLite выполняется отдельно по [инструкции импорта](https://github.com/jpegMushrum/hikari-secretary/blob/main/docs/production.md).
+с одной базой `hikari_dev`.
 
 Администратор пересылает сообщение в личный чат тестового бота. Бот
 создаёт черновик через backend и отвечает обычной карточкой черновика.
@@ -233,11 +226,10 @@ Compose использует токен тестового бота и `ADMIN_ID
 
 `MINIAPP_URL` здесь пустой: HTTP localhost открывается вручную в браузере,
 кнопка Telegram WebApp требует отдельного HTTPS адреса.
-`BOT_BACKGROUND_WORKERS_ENABLED=true` в локальном Compose включает публикации,
+`BOT_BACKGROUND_WORKERS_ENABLED=true` в корневом `.env` включает публикации,
 напоминания и уведомления для полного тестирования. Постановка в очередь
-приводит к реальной отправке в выбранные Telegram-цели. Проверьте цели и
-ожидающие задания в копии базы перед запуском бота. Для временной остановки
-фоновых отправок измените значение на `false` в Compose и пересоздайте
+приводит к реальной отправке в выбранные Telegram-цели. Для временной остановки
+фоновых отправок измените значение на `false` в корневом `.env` и пересоздайте
 контейнер бота.
 
 На странице мероприятий вкладка «Черновики» заменяет «Отменённые»;

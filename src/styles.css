@@ -22,6 +22,17 @@
 .publication-workspace h2 {
   margin-bottom: 20px;
 }
+.publication-dispatch {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+}
+.publication-dispatch h2 {
+  margin-bottom: 8px;
+}
+.publication-dispatch > .text-link {
+  margin-top: 8px;
+}
 .settings-fields {
   display: flex;
   flex-direction: column;
@@ -96,8 +107,23 @@
   background: var(--surface);
   color: var(--text);
 }
-.registration-preview {
+.preview-button-row {
+  display: flex;
+  gap: 6px;
   margin-top: 16px;
+}
+.preview-button-row > .button {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+}
+.message-preview .preview-success {
+  background: #22834b;
+  border-color: #22834b;
+  color: white;
+  text-decoration: none;
+}
+.preview-button-row > span {
   cursor: default;
 }
 @media (max-width: 1000px) {
