@@ -41,8 +41,8 @@ export function createGateway(upstream = 'http://backend:8080') {
     // No proxying bot endpoints, arbitrary destinations, encoded paths, or traversal.
     const pathname = (req.url || '').split('?')[0]
     if (
-      !/^\/api\/v1\/admin\/[a-z0-9/-]+$/.test(pathname) ||
-      !['GET', 'POST', 'PUT'].includes(req.method)
+      !(/^\/api\/v1\/admin\/[a-z0-9/-]+$/.test(pathname) && ['GET', 'POST', 'PUT'].includes(req.method)) &&
+      !(/^\/api\/v1\/member\/[a-z0-9/-]+$/.test(pathname) && ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method))
     )
       return json(404, { error: 'not_found' })
     const headers = { authorization: 'tma ' + initData(), accept: 'application/json' }

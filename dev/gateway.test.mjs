@@ -19,7 +19,7 @@ test('local initData is signed with the Telegram algorithm and dummy identity', 
   assert.equal(hash, expected)
 })
 
-test('gateway confines proxying to local admin requests and replaces client credentials', async (t) => {
+test('gateway confines proxying to local app requests and replaces client credentials', async (t) => {
   let forwarded
   const upstream = createServer((req, res) => {
     forwarded = { url: req.url, auth: req.headers.authorization }
@@ -33,13 +33,14 @@ test('gateway confines proxying to local admin requests and replaces client cred
   gateway.listen(0, '127.0.0.1')
   await once(gateway, 'listening')
   t.after(() => gateway.close())
-  const call = (path, headers = {}) =>
+  const call = (path, headers = {}, method = 'GET') =>
     new Promise((resolve, reject) => {
       const req = request(
         {
           host: '127.0.0.1',
           port: gateway.address().port,
           path,
+          method,
           headers: { host: 'localhost:5173', ...headers },
         },
         (res) => {
@@ -75,4 +76,9 @@ test('gateway confines proxying to local admin requests and replaces client cred
   )
   assert.equal(forwarded.url, '/api/v1/admin/people?page=2')
   assert.match(forwarded.auth, /^tma /)
+  assert.equal((await call('/api/v1/member/me')).status, 200)
+  assert.equal((await call('/api/v1/member/feedback/8', {}, 'DELETE')).status, 200)
+  assert.equal((await call('/api/v1/member/profile', {}, 'PATCH')).status, 200)
+  assert.equal((await call('/api/v1/admin/events/8', {}, 'DELETE')).status, 404)
+  assert.equal((await call('/api/v1/member/%2e%2e/admin/me')).status, 404)
 })

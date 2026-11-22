@@ -7,7 +7,7 @@ export class ApiError extends Error {
       status === 401
         ? 'Сессия истекла. Откройте приложение заново из Telegram.'
         : status === 403
-          ? 'Пока приложение доступно только администраторам клуба.'
+          ? 'У вас нет доступа к этому разделу.'
           : code === 'capacity_limit'
             ? 'Достигнут лимит: до пяти активных мероприятий или публикаций в очереди. В очереди может быть только один ИИ-пост.'
             : status === 409
@@ -36,7 +36,7 @@ declare global {
   }
 }
 
-async function request(path: string, options: RequestInit = {}): Promise<Response> {
+async function request(scope: 'admin' | 'member', path: string, options: RequestInit = {}): Promise<Response> {
   const headers = new Headers(options.headers)
   const initData = window.Telegram?.WebApp?.initData
   if (initData) headers.set('Authorization', 'tma ' + initData)
@@ -44,7 +44,7 @@ async function request(path: string, options: RequestInit = {}): Promise<Respons
     headers.set('Content-Type', 'application/json')
   let response: Response
   try {
-    response = await fetch('/api/v1/admin' + path, { ...options, headers })
+    response = await fetch('/api/v1/' + scope + path, { ...options, headers })
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error
     throw new Error('Нет соединения с сервером. Проверьте подключение.')
@@ -57,11 +57,26 @@ async function request(path: string, options: RequestInit = {}): Promise<Respons
 }
 
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await request(path, options)
+  const response = await request('admin', path, options)
   return response.status === 204 ? (undefined as T) : (response.json() as Promise<T>)
 }
 export async function apiBlob(path: string, signal?: AbortSignal) {
-  return (await request(path, { signal })).blob()
+  return (await request('admin', path, { signal })).blob()
+}
+
+export async function memberApi<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const response = await request('member', path, options)
+  return response.status === 204 ? (undefined as T) : (response.json() as Promise<T>)
+}
+export async function memberApiBlob(path: string, signal?: AbortSignal) {
+  return (await request('member', path, { signal })).blob()
+}
+export type MemberIdentity = Administrator & { is_admin: boolean }
+export type MemberProfile = {
+  full_name: string | null
+  is_russian_citizen: boolean | null
+  is_itmo_student: boolean | null
+  feedback_enabled: boolean
 }
 
 export type Page<T> = {

@@ -28,7 +28,7 @@ import {
   GripVertical,
   SlidersHorizontal,
 } from 'lucide-react'
-import { api, type Page } from './api'
+import { api, memberApi, type Page } from './api'
 import { positiveInteger } from './format'
 import { ErrorState } from './components'
 import './column-drag.css'
@@ -205,6 +205,7 @@ export function useList<T>(
   endpoint: string,
   defaults: { sort: string; order?: string },
   filters: string[],
+  scope: 'admin' | 'member' = 'admin',
 ) {
   const [params, setParams] = useSearchParams()
   const page = positiveInteger(params.get('page'), 1)
@@ -230,8 +231,9 @@ export function useList<T>(
   }
   const queryString = queryParams.toString()
   const query = useQuery({
-    queryKey: [endpoint, queryString],
-    queryFn: ({ signal }) => api<Page<T>>(endpoint + '?' + queryString, { signal }),
+    ...(scope === 'member' && { staleTime: 0, refetchOnWindowFocus: true }),
+    queryKey: scope === 'member' ? ['member', endpoint, queryString] : [endpoint, queryString],
+    queryFn: ({ signal }) => (scope === 'member' ? memberApi : api)<Page<T>>(endpoint + '?' + queryString, { signal }),
   })
   const set = useCallback(
     (key: string, value: string) =>

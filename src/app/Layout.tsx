@@ -1,10 +1,10 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Menu, Moon, Sun, X, ArrowUpRight } from 'lucide-react'
-import { modules } from './modules'
+import { Menu, Moon, Sun, X, ArrowLeftRight } from 'lucide-react'
+import { modules, memberModules } from './modules'
 import { hikariRelease, version } from '../../package.json'
-import { api, type Administrator } from '../shared/api'
+import { memberApi, type MemberIdentity } from '../shared/api'
 import { ErrorState, Loading } from '../shared/components'
 import { AdministratorContext } from '../shared/table'
 
@@ -21,14 +21,18 @@ export default function Layout() {
     menuButton = useRef<HTMLButtonElement>(null)
   const location = useLocation(),
     navigate = useNavigate()
-  const current = modules.find((m) =>
-    (m.roots || [m.path]).some((path) => location.pathname.startsWith(path)),
-  )
   const me = useQuery({
-    queryKey: ['me'],
-    queryFn: ({ signal }) => api<Administrator>('/me', { signal }),
+    queryKey: ['member', 'me'],
+    queryFn: ({ signal }) => memberApi<MemberIdentity>('/me', { signal }),
     retry: false,
   })
+  const adminPath = location.pathname === '/admin' || location.pathname.startsWith('/admin/')
+  const adminMode = !!me.data?.is_admin && adminPath
+  const navigation = adminMode ? modules : memberModules
+  const current = navigation.find((m) =>
+    (m.roots || [m.path]).some((path) => location.pathname === path || location.pathname.startsWith(path + '/')),
+  )
+  const home = me.data?.is_admin ? '/admin/events' : '/events'
   const environment = useQuery({
     queryKey: ['environment'],
     queryFn: async () => {
@@ -56,15 +60,20 @@ export default function Layout() {
     tg?.ready?.()
     tg?.expand?.()
     const back = () => {
+      const modal = document.querySelector<HTMLDialogElement>('dialog[open]')
+      if (modal) {
+        modal.dispatchEvent(new Event('cancel', { cancelable: true }))
+        return
+      }
       if (window.history.state?.idx > 0) navigate(-1)
-      else navigate(current?.path ?? '/admin', { replace: true })
+      else navigate(current?.path ?? home, { replace: true })
     }
-    if (location.pathname.split('/').length > 3) {
+    if (current && ![current.path, current.path + '/'].includes(location.pathname)) {
       tg?.BackButton?.show()
       tg?.BackButton?.onClick(back)
     } else tg?.BackButton?.hide()
     return () => tg?.BackButton?.offClick(back)
-  }, [location.pathname, navigate, current])
+  }, [location.pathname, navigate, current, home])
   useEffect(() => {
     if (!open) return
     document.body.style.overflow = 'hidden'
@@ -94,6 +103,10 @@ export default function Layout() {
       document.removeEventListener('keydown', key)
     }
   }, [open])
+  if (me.isPending) return <main className="page-content"><Loading /></main>
+  if (me.error) return <main className="page-content"><ErrorState error={me.error} retry={() => void me.refetch()} /></main>
+  if (location.pathname === '/' || (adminPath && !adminMode)) return <Navigate to={home} replace />
+
   return (
     <div className="app-shell">
       <a href="#main-content" className="skip-link">
@@ -134,9 +147,9 @@ export default function Layout() {
             <X size={21} />
           </button>
         </div>
-        <div className="navigation-label">УПРАВЛЕНИЕ КЛУБОМ</div>
+        {adminMode && <div className="navigation-label">УПРАВЛЕНИЕ КЛУБОМ</div>}
         <nav>
-          {modules.map((m) => (
+          {navigation.map((m) => (
             <NavLink
               key={m.id}
               to={m.path}
@@ -148,6 +161,12 @@ export default function Layout() {
           ))}
         </nav>
         <div className="sidebar-bottom">
+          {me.data.is_admin && (
+            <Link className="nav-item" to={adminMode ? '/events' : '/admin/events'}>
+              <ArrowLeftRight size={20} strokeWidth={1.7} />
+              {adminMode ? 'Режим участника' : 'Режим администратора'}
+            </Link>
+          )}
           <p className="release-caption">
             Hikari Secretary ·{' '}
             <time dateTime={hikariRelease.date}>
@@ -160,9 +179,8 @@ export default function Layout() {
             <span className="avatar">{me.data?.first_name?.slice(0, 1) || 'H'}</span>
             <div>
               <strong>{me.data?.first_name || 'Hikari'}</strong>
-              <small>Администратор</small>
+              <small>{adminMode ? 'Администратор' : 'Участник'}</small>
             </div>
-            <ArrowUpRight size={15} className="muted" />
           </div>
         </div>
       </aside>
@@ -179,7 +197,7 @@ export default function Layout() {
             >
               <Menu size={22} />
             </button>
-            <Link className="breadcrumb" to={current?.path ?? '/admin'}>
+            <Link className="breadcrumb" to={current?.path ?? home}>
               {current?.label || 'Обзор'}
             </Link>
           </div>
@@ -202,17 +220,11 @@ export default function Layout() {
           </div>
         </header>
         <main id="main-content" className="page-content">
-          {me.isPending ? (
-            <Loading />
-          ) : me.error ? (
-            <ErrorState error={me.error} retry={() => void me.refetch()} />
-          ) : (
             <AdministratorContext.Provider value={me.data.telegram_id}>
               <Suspense fallback={<Loading />}>
                 <Outlet />
               </Suspense>
             </AdministratorContext.Provider>
-          )}
         </main>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { apiBlob, type Publication, type MessageEntity } from '../../shared/api'
+import { apiBlob, memberApiBlob, type Publication, type MessageEntity } from '../../shared/api'
 import { TelegramMentions } from '../../shared/TelegramLink'
 
 export function safeLink(raw: unknown): string | undefined {
@@ -94,7 +94,7 @@ export function EntityText({
   )
 }
 
-function PreviewImage({ publicationId, position }: { publicationId: number; position: number }) {
+function PreviewImage({ path, member }: { path: string; member: boolean }) {
   const [url, setUrl] = useState<string>(),
     [error, setError] = useState(false)
   useEffect(() => {
@@ -102,7 +102,8 @@ function PreviewImage({ publicationId, position }: { publicationId: number; posi
     let objectURL: string | undefined
     setUrl(undefined)
     setError(false)
-    apiBlob(`/publications/${publicationId}/media/${position}`, controller.signal)
+    const load = member ? memberApiBlob : apiBlob
+    load(path, controller.signal)
       .then((blob) => {
         if (!controller.signal.aborted) {
           objectURL = URL.createObjectURL(blob)
@@ -116,7 +117,7 @@ function PreviewImage({ publicationId, position }: { publicationId: number; posi
       controller.abort()
       if (objectURL) URL.revokeObjectURL(objectURL)
     }
-  }, [publicationId, position])
+  }, [path, member])
   return error ? (
     <p className="muted">Изображение недоступно. Оригинал сохранён в Telegram.</p>
   ) : url ? (
@@ -186,8 +187,21 @@ function buttonLabel(value: unknown, depth = 0): string {
   return buttonLabel(node.text ?? node.items, depth + 1)
 }
 
-export function PublicationPreview({ publication }: { publication: Publication }) {
+export type Announcement = Pick<Publication, 'id' | 'text' | 'entities' | 'rich_message'> & {
+  media: { position: number }[]
+  event?: Publication['event']
+}
+
+export function PublicationPreview({
+  publication, memberEventId,
+}: { publication: Announcement; memberEventId?: number }) {
   let photo = 0
+  const mediaBase = memberEventId == null
+    ? '/publications/' + publication.id
+    : '/events/' + memberEventId
+  const renderImage = (position: number) => (
+    <PreviewImage key={position} path={mediaBase + '/media/' + position} member={memberEventId != null} />
+  )
   const blocks = (values: unknown, depth = 0): ReactNode => {
     if (depth > 20 || !Array.isArray(values)) return null
     return values.map((value, index) => {
@@ -282,7 +296,7 @@ export function PublicationPreview({ publication }: { publication: Publication }
         case 'photo': {
           const position = photo++
           const image = publication.media?.[position] ? (
-            <PreviewImage publicationId={publication.id} position={position} />
+            renderImage(publication.media[position].position)
           ) : (
             <p className="muted">Фото доступно в оригинале Telegram.</p>
           )
@@ -303,7 +317,7 @@ export function PublicationPreview({ publication }: { publication: Publication }
         case 'buttons': {
           const buttons = Array.isArray(b.buttons)
             ? b.buttons.filter(button => button && (
-                !publication.event || buttonLabel(button.text).trim().toLowerCase() !== 'зарегистрироваться'
+                (!publication.event && memberEventId == null) || buttonLabel(button.text).trim().toLowerCase() !== 'зарегистрироваться'
               ))
             : []
           if (!buttons.length) return null
@@ -336,22 +350,20 @@ export function PublicationPreview({ publication }: { publication: Publication }
     })
   }
   return (
-    <article className="message-preview" aria-label="Предпросмотр анонса">
+    <article className="message-preview" aria-label={memberEventId == null ? 'Предпросмотр анонса' : 'Анонс мероприятия'}>
       {publication.rich_message ? (
         blocks(publication.rich_message.blocks)
       ) : (
         <>
           <div className="preview-media">
-            {publication.media?.map((m) => (
-              <PreviewImage key={m.position} publicationId={publication.id} position={m.position} />
-            ))}
+            {publication.media?.map((m) => renderImage(m.position))}
           </div>
           <p>
             <EntityText text={publication.text} entities={publication.entities} />
           </p>
         </>
       )}
-      {publication.event && (
+      {memberEventId == null && publication.event && (
         <div className="preview-button-row">
           <span className="button preview-success">Зарегистрироваться</span>
         </div>

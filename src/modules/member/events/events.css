@@ -1,0 +1,116 @@
+.member-event-actions {
+  padding: 18px 0;
+  border-top: 1px solid var(--line);
+}
+.member-event-actions h2 {
+  margin: 0 0 14px;
+  font-size: 1.1rem;
+}
+.member-personal-status {
+  margin: 0 0 24px;
+}
+.member-registration {
+  margin-top: 20px;
+}
+.member-registration-controls,
+.member-registration .member-cancel-registration {
+  width: min(100%, 20rem);
+  font-size: 15px;
+  line-height: 1.35;
+}
+.member-registration-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.member-registration-controls > .button,
+.reminder-toggle,
+.reminder-picker [role='option'] {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 0;
+  box-sizing: border-box;
+  font: inherit;
+  white-space: normal;
+}
+.member-registration-controls > .button {
+  border-radius: 9px 9px 0 0;
+  font-weight: 600;
+}
+.member-registration-controls > .button + .reminder-picker,
+.reminder-picker [role='option'] + [role='option'] {
+  border-top: 1px solid var(--line);
+}
+.reminder-picker {
+  position: relative;
+}
+.reminder-toggle {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 6px;
+  text-align: start;
+  background: transparent;
+  color: inherit;
+}
+.reminder-toggle[aria-expanded='true'] {
+  opacity: 0;
+}
+.reminder-picker [role='listbox'] {
+  position: absolute;
+  z-index: 3;
+  inset-inline: 0;
+  bottom: 0;
+  max-height: min(50dvh, var(--reminder-space, 50dvh));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+}
+.reminder-picker [role='option'] {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding-inline: 32px;
+  text-align: center;
+  cursor: pointer;
+}
+.reminder-picker [role='option'] svg {
+  position: absolute;
+  right: 12px;
+}
+.reminder-picker [role='option']:hover,
+.reminder-picker [role='option'][data-active='true'] {
+  background: var(--hover);
+}
+.member-registration-controls :focus-visible {
+  outline-offset: -3px;
+}
+.member-registration .member-cancel-registration {
+  display: flex;
+  min-height: 46px;
+  font-weight: inherit;
+  margin-top: 12px;
+}
+.member-binary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.member-binary label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding-inline: 10px;
+}
+.member-binary input[type='radio'] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}

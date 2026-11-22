@@ -6,6 +6,8 @@ import Layout from './app/Layout'
 import { ErrorBoundary } from './app/ErrorBoundary'
 import {
   modules,
+  memberModules,
+  MemberEventDetail,
   EventDetail,
   PublicationsPage,
   PublicationDetail,
@@ -35,11 +37,12 @@ function start() {
           <BrowserRouter>
             <Routes>
               <Route element={<Layout />}>
-                <Route index element={<Navigate to="/admin/events" replace />} />
                 <Route path="/admin" element={<Navigate to="/admin/events" replace />} />
-                {modules.map((m) => (
-                  <Route key={m.id} path={m.path} element={<m.component />} />
+                <Route index element={null} />
+                {[...modules, ...memberModules].map((m) => (
+                  <Route key={m.path} path={m.path} element={<m.component />} />
                 ))}
+                <Route path="/events/:id" element={<MemberEventDetail />} />
                 <Route
                   path="/admin/events/new"
                   element={<Navigate to="/admin/events/drafts?status=draft" replace />}
@@ -54,7 +57,7 @@ function start() {
                   element={
                     <div className="empty-state">
                       <h1>Страница не найдена</h1>
-                      <Link className="text-link" to="/admin/events">
+                      <Link className="text-link" to="/">
                         К мероприятиям
                       </Link>
                     </div>
