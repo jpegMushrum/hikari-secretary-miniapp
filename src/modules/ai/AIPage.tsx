@@ -7,6 +7,7 @@ import { PageHeader, ErrorState, Loading, SelectFilter } from '../../shared/comp
 import { DataTable, useList } from '../../shared/table'
 import { dateTime } from '../../shared/format'
 import { GenerationStatus, PublicationStatus, topicTitle } from './AIJobStatus'
+import { AutomationControls } from './AutomationControls'
 
 export default function AIPage() {
   const location = useLocation()
@@ -128,7 +129,10 @@ export default function AIPage() {
           {save.error && <ErrorState error={save.error} />}
         </form>
       )}
-      <LatestGeneration enabled={settings.data?.enabled} />
+      <div className="ai-actions">
+        <QueueGeneration enabled={settings.data?.enabled && !save.isPending} />
+        <AutomationControls />
+      </div>
       <div className="section-heading">
         <h2>История тем</h2>
         <SelectFilter
@@ -159,6 +163,7 @@ function useRefreshJobViews(job: AIJob | null | undefined) {
   const client = useQueryClient()
   useEffect(() => {
     if (!job) return
+    void client.invalidateQueries({ queryKey: ['/ai/automation'] })
     void client.invalidateQueries({ queryKey: ['ai-job', String(job.id)] })
     void client.invalidateQueries({ queryKey: ['/ai/history'] })
     if (job.publication_id != null) {
@@ -169,7 +174,7 @@ function useRefreshJobViews(job: AIJob | null | undefined) {
   }, [client, job])
 }
 
-function LatestGeneration({ enabled }: { enabled?: boolean }) {
+function QueueGeneration({ enabled }: { enabled?: boolean }) {
   const client = useQueryClient()
   const latest = useQuery({
     queryKey: ['ai-latest'],
@@ -178,61 +183,48 @@ function LatestGeneration({ enabled }: { enabled?: boolean }) {
     refetchInterval: ({ state }) => (isGenerating(state.data) ? 3000 : 15000),
   })
   const job = latest.data
-  const regenerate = useMutation({
-    mutationFn: () => api<{ id: number }>('/ai/history/latest/regenerate', { method: 'POST' }),
+  const enqueue = useMutation({
+    mutationFn: () => api<{ job_id: number }>('/ai/generations/queue', { method: 'POST' }),
     onSettled: () => client.invalidateQueries({ queryKey: ['ai-latest'] }),
   })
-  const acceptedId = regenerate.data?.id
-  const trackSeparately = acceptedId != null && acceptedId !== job?.id
+  const acceptedId = enqueue.data?.job_id
   const tracked = useQuery({
-    queryKey: ['ai-replacement', acceptedId, regenerate.submittedAt],
+    queryKey: ['ai-queued', acceptedId, enqueue.submittedAt],
     queryFn: ({ signal }) => api<AIJob>('/ai/history/' + acceptedId, { signal }),
-    enabled: trackSeparately,
+    enabled: acceptedId != null,
     refetchInterval: ({ state }) => (isGenerating(state.data) ? 3000 : false),
   })
-  const replacement = trackSeparately ? tracked.data : acceptedId != null ? job : null
   useRefreshJobViews(job)
-  useRefreshJobViews(trackSeparately ? tracked.data : null)
+  useRefreshJobViews(tracked.data)
 
-  const waitingForReplacement = (trackSeparately && tracked.isPending) || isGenerating(replacement)
-  const lastError = (replacement ?? job)?.last_error
+  const waiting = acceptedId != null && (tracked.isPending || isGenerating(tracked.data))
+  const lastError = (tracked.data ?? job)?.last_error
 
   let status = ''
-  if (regenerate.isPending) status = 'Запускаем генерацию…'
-  else if (waitingForReplacement) status = 'Генерация выполняется.'
-  else if (trackSeparately && replacement?.status === 'scheduled')
+  if (enqueue.isPending) status = 'Запускаем генерацию…'
+  else if (waiting) status = 'Генерация выполняется.'
+  else if (tracked.data?.publication_status === 'scheduled' && tracked.data.status === 'scheduled')
     status = 'Новый материал поставлен в очередь.'
-  else if (latest.isPending) status = 'Проверяем последнее задание…'
-  else if (enabled === false) status = 'Для замены подключите генератор.'
-  else if (!latest.error && !job) status = 'Заданий ИИ пока нет.'
   else if (isGenerating(job)) status = 'Генерация выполняется.'
-  else if (job && !job.can_regenerate) status = 'Последнюю генерацию уже нельзя заменить.'
-  else if (replacement?.status === 'scheduled') status = 'Новый материал поставлен в очередь.'
 
-  let error = regenerate.error
+  let error = enqueue.error
   if (error instanceof ApiError && error.code === 'ai_disabled')
     error = new Error('Генератор не подключён.')
   if (error instanceof ApiError && error.code === 'invalid_state')
-    error = new Error('Состояние задания изменилось. Замена сейчас недоступна.')
+    error = new Error('Состояние очереди изменилось. Попробуйте ещё раз.')
   return (
     <>
-      <div className="button-row">
-        <button
-          type="button"
-          className="button secondary"
-          disabled={
-            !job?.can_regenerate || !!latest.error || regenerate.isPending || waitingForReplacement
-          }
-          onClick={() => regenerate.mutate()}
-        >
-          Заменить последнюю генерацию
-        </button>
-        <span className="muted" role="status">
-          {status}
-        </span>
-      </div>
+      <button
+        type="button"
+        className="button secondary"
+        disabled={!enabled || enqueue.isPending || waiting}
+        onClick={() => enqueue.mutate()}
+      >
+        Поставить новую генерацию в очередь
+      </button>
+      {status && <span className="muted" role="status">{status}</span>}
       {latest.error && <ErrorState error={latest.error} retry={() => void latest.refetch()} />}
-      {trackSeparately && tracked.error && (
+      {acceptedId != null && tracked.error && (
         <ErrorState error={tracked.error} retry={() => void tracked.refetch()} />
       )}
       {error && <ErrorState error={error} />}

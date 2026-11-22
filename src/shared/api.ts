@@ -9,7 +9,7 @@ export class ApiError extends Error {
         : status === 403
           ? 'Пока приложение доступно только администраторам клуба.'
           : code === 'capacity_limit'
-            ? 'Достигнут лимит: не более пяти активных мероприятий или публикаций.'
+            ? 'Достигнут лимит: до пяти активных мероприятий или публикаций в очереди. В очереди может быть только один ИИ-пост.'
             : status === 409
               ? 'Состояние изменилось. Обновите страницу и повторите действие.'
               : status === 400
@@ -152,6 +152,12 @@ export type MessageEntity = {
   user?: { id: number }
 }
 export type AISettings = { jlpt_level: string; admin_comment: string | null; enabled: boolean }
+export type AIAutomation = {
+  enabled: boolean
+  configured: boolean
+  can_cancel_queued: boolean
+  queued_publication_id: number | null
+}
 export type AITopicVersion = { version: number; topic: Record<string, unknown> }
 export type AIJob = {
   id: number

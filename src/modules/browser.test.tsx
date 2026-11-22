@@ -342,11 +342,105 @@ it('browses all AI material versions and restores the queued publication preview
   expect(screen.queryByText('切符')).toBeNull()
 })
 
-const replacementLabel = 'Заменить последнюю генерацию'
+const generationLabel = 'Поставить новую генерацию в очередь'
 const emptyHistory = { items: [], page: { number: 1, size: 10, total_items: 0, total_pages: 0 } }
 
+it('waits for updated generation settings before requesting a post', async () => {
+  const user = userEvent.setup()
+  let finishSave!: () => void
+  const savePending = new Promise<void>((resolve) => { finishSave = resolve })
+  const requests: string[] = []
+  vi.stubGlobal('fetch', async (url: string, options?: RequestInit) => {
+    if (url.endsWith('/ai/settings')) {
+      if (options?.method === 'PUT') {
+        await savePending
+        requests.push('saved')
+      }
+      return json({ enabled: true, jlpt_level: 'N3' })
+    }
+    if (url.endsWith('/ai/generations/queue')) {
+      requests.push('queued')
+      return json({ job_id: 9 }, 202)
+    }
+    if (url.endsWith('/history/9')) return json({ id: 9, status: 'scheduled', publication_status: 'scheduled' })
+    if (url.endsWith('/latest')) return new Response(null, { status: 204 })
+    return json(emptyHistory)
+  })
+  mount(<AIPage />, '/admin/ai')
+  await user.type(await screen.findByLabelText('Пожелания к темам'), 'Культура')
+  await user.click(screen.getByRole('button', { name: 'Сохранить настройки' }))
+  const queue = screen.getByRole<HTMLButtonElement>('button', { name: generationLabel })
+  expect(queue.disabled).toBe(true)
+  await user.click(queue)
+  expect(requests).toEqual([])
+  finishSave()
+  await waitFor(() => expect(queue.disabled).toBe(false))
+  await user.click(queue)
+  await screen.findByText('Новый материал поставлен в очередь.')
+  expect(requests).toEqual(['saved', 'queued'])
+})
+
+it('cancels a queued AI post independently of the schedule and calendar day', async () => {
+  const user = userEvent.setup()
+  let state = { enabled: true, configured: true, can_cancel_today: false, can_cancel_queued: true, queued_publication_id: 23 as number | null }
+  const fetcher = vi.fn(async (url: string, options?: RequestInit) => {
+    if (url.endsWith('/ai/automation')) {
+      if (options?.method === 'PUT') state = { ...state, ...JSON.parse(String(options.body)) }
+      return json(state)
+    }
+    if (url.endsWith('/ai/automation/cancel-queued') && options?.method === 'POST') {
+      state = { ...state, can_cancel_queued: false, queued_publication_id: null }
+      return json(state)
+    }
+    if (url.endsWith('/ai/settings')) return json({ enabled: true, jlpt_level: 'N3' })
+    if (url.endsWith('/latest')) return new Response(null, { status: 204 })
+    return json(emptyHistory)
+  })
+  vi.stubGlobal('fetch', fetcher)
+  mount(<AIPage />, '/admin/ai')
+
+  await user.click(await screen.findByRole('button', { name: 'Выключить автогенерацию' }))
+  const resume = await screen.findByRole('button', { name: 'Включить автогенерацию' })
+  const cancel = screen.getByRole('button', { name: 'Отменить выход поста' }) as HTMLButtonElement
+  await waitFor(() => expect(cancel.disabled).toBe(false))
+  await user.click(cancel)
+  await screen.findByText('Выход поста отменён.')
+  expect(cancel.disabled).toBe(true)
+  await user.click(resume)
+  await screen.findByRole('button', { name: 'Выключить автогенерацию' })
+  expect(cancel.disabled).toBe(true)
+  expect(fetcher.mock.calls.filter(([, opts]) => opts?.method).map(([url, opts]) => [
+    url, opts?.method, opts?.body,
+  ])).toEqual([
+    ['/api/v1/admin/ai/automation', 'PUT', '{"enabled":false}'],
+    ['/api/v1/admin/ai/automation/cancel-queued', 'POST', '{"publication_id":23}'],
+    ['/api/v1/admin/ai/automation', 'PUT', '{"enabled":true}'],
+  ])
+})
+
+it('refreshes cancellation availability when the queued publication has just started delivery', async () => {
+  let canCancel = true
+  vi.stubGlobal('fetch', async (url: string) => {
+    if (url.endsWith('/ai/automation/cancel-queued')) {
+      canCancel = false
+      return json({ error: 'invalid_state' }, 409)
+    }
+    if (url.endsWith('/ai/automation'))
+      return json({ enabled: true, configured: true, can_cancel_queued: canCancel, queued_publication_id: canCancel ? 23 : null })
+    if (url.endsWith('/ai/settings')) return json({ enabled: true, jlpt_level: 'N3' })
+    if (url.endsWith('/latest')) return new Response(null, { status: 204 })
+    return json(emptyHistory)
+  })
+  mount(<AIPage />, '/admin/ai')
+  const cancel = await screen.findByRole<HTMLButtonElement>('button', { name: 'Отменить выход поста' })
+  await userEvent.setup().click(cancel)
+  await screen.findByRole('alert')
+  expect(cancel.disabled).toBe(true)
+  expect(screen.queryByText('Выход поста отменён.')).toBeNull()
+})
+
 it.each(['failed', 'scheduled'])(
-  'replaces the latest %s generation from the filtered AI page',
+  'queues a generation from the filtered AI page when the previous job is %s',
   async (initial) => {
     const user = userEvent.setup()
     let status = initial
@@ -355,14 +449,15 @@ it.each(['failed', 'scheduled'])(
       finishRequest = resolve
     })
     const fetcher = vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.endsWith('/ai/automation')) return json({ enabled: true, configured: true, can_cancel_queued: false })
       if (url.endsWith('/ai/settings')) return json({ enabled: true, jlpt_level: 'N3' })
       if (url.includes('/ai/history?')) return json(emptyHistory)
-      if (url.endsWith('/ai/history/latest/regenerate') && options?.method === 'POST') {
+      if (url.endsWith('/ai/generations/queue') && options?.method === 'POST') {
         await pending
         status = 'pending'
-        return json({ accepted: true, id: 5 }, 202)
+        return json({ job_id: 5 }, 202)
       }
-      if (!url.endsWith('/ai/history/latest')) throw new Error('unexpected request')
+      if (!url.endsWith('/ai/history/latest') && !url.endsWith('/ai/history/5')) throw new Error('unexpected request')
       return json({
         id: 5,
         status,
@@ -372,7 +467,7 @@ it.each(['failed', 'scheduled'])(
     })
     vi.stubGlobal('fetch', fetcher)
     mount(<AIPage />, '/admin/ai?status=cancelled&page=2')
-    const button = screen.getByRole('button', { name: replacementLabel }) as HTMLButtonElement
+    const button = screen.getByRole('button', { name: generationLabel }) as HTMLButtonElement
     await waitFor(() => expect(button.disabled).toBe(false))
     await user.dblClick(button)
     expect(fetcher.mock.calls.filter(([, opts]) => opts?.method === 'POST')).toHaveLength(1)
@@ -395,17 +490,26 @@ it.each(['failed', 'scheduled'])(
   8000,
 )
 
-it('keeps the action visible and disabled when there are no generation jobs', async () => {
+it.each(['empty', 'cancelled', 'sent'])('queues a post when previous history is %s', async (history) => {
+  let requests = 0
   vi.stubGlobal('fetch', async (url: string) => {
-    if (url.endsWith('/latest')) return new Response(null, { status: 204 })
+    if (url.endsWith('/latest')) return history === 'empty'
+      ? new Response(null, { status: 204 })
+      : json({ id: 8, status: 'scheduled', publication_status: history, can_regenerate: false })
+    if (url.endsWith('/ai/generations/queue')) {
+      requests++
+      return json({ job_id: 9 }, 202)
+    }
+    if (url.endsWith('/history/9')) return json({ id: 9, status: 'scheduled', publication_status: 'scheduled' })
     if (url.endsWith('/settings')) return json({ enabled: true, jlpt_level: 'N3' })
     return json(emptyHistory)
   })
   mount(<AIPage />, '/admin/ai')
-  await screen.findByText('Заданий ИИ пока нет.')
-  expect(
-    (screen.getByRole('button', { name: replacementLabel }) as HTMLButtonElement).disabled,
-  ).toBe(true)
+  const button = screen.getByRole<HTMLButtonElement>('button', { name: generationLabel })
+  await waitFor(() => expect(button.disabled).toBe(false))
+  await userEvent.setup().click(button)
+  await screen.findByText('Новый материал поставлен в очередь.')
+  expect(requests).toBe(1)
 })
 
 it.each([false, true])(
@@ -418,14 +522,15 @@ it.each([false, true])(
       attempts: 1,
       scheduled_for: '2026-11-20T09:00:00Z',
       status: finished ? 'scheduled' : active ? 'generating' : 'failed',
+      publication_status: finished ? 'scheduled' : null,
       can_regenerate: !active || finished,
       topic: finished ? { title: 'Новая тема' } : null,
     })
     vi.stubGlobal('fetch', async (url: string) => {
       if (url.endsWith('/settings')) return json({ enabled: true, jlpt_level: 'N3' })
-      if (url.endsWith('/regenerate')) {
+      if (url.endsWith('/ai/generations/queue')) {
         active = true
-        return json({ accepted: true, id: 5 }, 202)
+        return json({ job_id: 5 }, 202)
       }
       if (url.endsWith('/latest') && active && submittedHere)
         return json({ ...job(), id: 6, status: 'scheduled', publication_status: 'sent', can_regenerate: false })
@@ -434,7 +539,7 @@ it.each([false, true])(
     })
     mount(<AIPage />, '/admin/ai')
     if (submittedHere) {
-      const button = screen.getByRole('button', { name: replacementLabel }) as HTMLButtonElement
+      const button = screen.getByRole('button', { name: generationLabel }) as HTMLButtonElement
       await waitFor(() => expect(button.disabled).toBe(false))
       await userEvent.setup().click(button)
     }
@@ -447,10 +552,10 @@ it.each([false, true])(
   8000,
 )
 
-it('refreshes the latest generation when delivery starts before replacement', async () => {
+it('allows retry after the queue changes during a generation request', async () => {
   let sent = false
   vi.stubGlobal('fetch', async (url: string) => {
-    if (url.endsWith('/regenerate')) {
+    if (url.endsWith('/ai/generations/queue')) {
       sent = true
       return json({ error: 'invalid_state' }, 409)
     }
@@ -465,12 +570,11 @@ it('refreshes the latest generation when delivery starts before replacement', as
     return json(emptyHistory)
   })
   mount(<AIPage />, '/admin/ai')
-  const button = screen.getByRole('button', { name: replacementLabel }) as HTMLButtonElement
+  const button = screen.getByRole('button', { name: generationLabel }) as HTMLButtonElement
   await waitFor(() => expect(button.disabled).toBe(false))
   await userEvent.setup().click(button)
-  expect((await screen.findByRole('alert')).textContent).toContain('Состояние задания изменилось')
-  await screen.findByText('Последнюю генерацию уже нельзя заменить.')
-  expect(button.disabled).toBe(true)
+  expect((await screen.findByRole('alert')).textContent).toContain('Состояние очереди изменилось')
+  expect(button.disabled).toBe(false)
 })
 
 it('API forwards Telegram initData when present and reports denied access', async () => {

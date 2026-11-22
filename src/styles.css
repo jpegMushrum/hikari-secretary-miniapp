@@ -970,6 +970,16 @@ legend {
 .ai-settings .form-grid {
   grid-template-columns: 180px 1fr;
 }
+.ai-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: min(100%, 20rem);
+  gap: 10px;
+}
+.ai-actions > .button {
+  order: -1;
+  white-space: normal;
+}
 .feedback-preview {
   display: -webkit-box;
   -webkit-line-clamp: 2;
