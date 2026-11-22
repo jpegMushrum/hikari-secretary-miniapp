@@ -1,6 +1,6 @@
 # Hikari Mini App
 
-![Версия](https://img.shields.io/badge/version-v0.2.0-61DAFB)
+![Версия](https://img.shields.io/badge/version-v0.1.5-61DAFB)
 
 Административный интерфейс клуба: React + TypeScript + Vite, React Router,
 TanStack Query и TanStack Table. Тёмная тема по умолчанию, красный акцент,
