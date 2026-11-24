@@ -1,0 +1,38 @@
+.santa-page { max-width: 52rem; }
+.santa-reveal { margin-block: .75rem; }
+.santa-reveal > button { display: inline-flex; align-items: center; gap: .3rem; }
+.santa-page > section { margin: 0 0 2rem; }
+.santa-page h2 { margin-bottom: 1rem; }
+.santa-facts { display: flex; flex-wrap: wrap; gap: 1.1rem 2rem; margin: 0 0 1.5rem; }
+.santa-member-facts { flex-direction: column; }
+.santa-wish-quote {
+  box-sizing: border-box;
+  width: fit-content;
+  max-width: min(100%, 36rem);
+  margin: .5rem 0 0;
+  padding: .65rem .85rem;
+  border-inline-start: 3px solid var(--accent);
+  border-radius: .25rem .75rem .75rem .25rem;
+  background: var(--surface);
+  line-height: 1.5;
+}
+.santa-recipient-contact { overflow-wrap: anywhere; }
+.santa-facts dt, .santa-heading > span { color: var(--muted); font-size: .85rem; }
+.santa-facts dd { margin: .25rem 0 0; overflow-wrap: anywhere; }
+.santa-heading { display: flex; align-items: baseline; gap: .75rem; }
+.santa-form { display: grid; gap: 1rem; max-width: 36rem; }
+.santa-form > label { display: grid; gap: .4rem; min-width: 0; }
+.santa-form :is(input,textarea) { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+.santa-form button { justify-self: start; }
+.santa-page .button, .santa-form .button { white-space: normal; }
+.santa-page [aria-pressed=true] { border-color: var(--accent); background: var(--selected); color: var(--text); opacity: 1; }
+.santa-page p, .santa-summary p { line-height: 1.5; margin: .55rem 0; }
+.santa-prose { white-space: pre-wrap; overflow-wrap: anywhere; }
+.santa-list { padding: 0; list-style: none; margin: .5rem 0 1rem; }
+.santa-list li { border-bottom: 1px solid var(--line); padding: .8rem 0; overflow-wrap: anywhere; }
+.santa-pairs li { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); gap: .8rem; }
+.santa-summary { margin-bottom: 1rem; }
+@media (max-width: 520px) {
+  .santa-facts { gap: .9rem 1.25rem; }
+  .santa-form :is(input,textarea) { font-size: 16px; }
+}

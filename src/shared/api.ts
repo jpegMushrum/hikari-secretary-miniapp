@@ -40,6 +40,10 @@ async function request(scope: 'admin' | 'member', path: string, options: Request
   const headers = new Headers(options.headers)
   const initData = window.Telegram?.WebApp?.initData
   if (initData) headers.set('Authorization', 'tma ' + initData)
+  else if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+    const profile = sessionStorage.getItem('hikari.localProfile')
+    if (profile) headers.set('X-Local-Profile', profile)
+  }
   if (options.body && typeof options.body === 'string')
     headers.set('Content-Type', 'application/json')
   let response: Response

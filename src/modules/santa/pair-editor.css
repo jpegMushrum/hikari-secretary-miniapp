@@ -1,0 +1,64 @@
+.santa-pair-hint, .santa-pair-legend, .santa-assignment-heading, .santa-assignment small, .santa-pair-status {
+  color: var(--muted);
+  font-size: .85rem;
+}
+.member-modal.santa-pair-modal {
+  min-height: 0;
+}
+.santa-pair-modal[open]:has(.santa-assignments) {
+  display: flex;
+  flex-direction: column;
+  height: min(48rem, calc(100dvh - 1rem));
+}
+.santa-pair-modal > header, .santa-pair-modal > .button-row { flex: none; }
+.santa-pair-body:has(.santa-assignments),
+.santa-pair-body > .santa-reveal:has(.santa-assignments) {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-bottom: 0;
+}
+.santa-pair-body { overflow-y: auto; }
+.santa-pair-body > .santa-reveal > button { align-self: flex-start; }
+.santa-pair-modal > .button-row { margin-top: 1.25rem; }
+.santa-assignments {
+  flex: 1 1 auto;
+  min-height: 4rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.santa-assignment {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: .5rem;
+  border-bottom: 1px solid var(--line);
+}
+.santa-assignment > div, .santa-assignment-heading > span { min-width: 0; padding: .5rem; }
+.santa-pair-legend, .santa-assignments { --santa-change-color: #edc449; }
+[data-theme="light"] :is(.santa-pair-legend, .santa-assignments) { --santa-change-color: #a37b00; }
+.santa-pair-legend { display: flex; align-items: baseline; gap: .5rem; }
+.santa-pair-legend::before {
+  content: ''; flex: 0 0 .55rem; height: .55rem; border-radius: 50%; background: var(--santa-change-color);
+}
+.santa-assignment[data-changed] {
+  background: color-mix(in srgb, var(--santa-change-color) 12%, transparent);
+  box-shadow: inset 3px 0 var(--santa-change-color);
+}
+.santa-assignment-heading { position: sticky; top: 0; background: var(--surface); z-index: 1; }
+.santa-recipient { display: flex; align-items: flex-start; justify-content: space-between; gap: .25rem; }
+.santa-recipient > div { min-width: 0; }
+.santa-recipient[data-drop-target] { outline: 2px solid var(--santa-change-color); outline-offset: -2px; }
+.santa-assignment small { display: block; margin-top: .25rem; overflow-wrap: anywhere; }
+.santa-person-wishes > summary {
+  display: flex; align-items: center; gap: .3rem; min-height: 1.75rem;
+  cursor: pointer; list-style: none; overflow-wrap: anywhere;
+}
+.santa-person-wishes > summary::-webkit-details-marker { display: none; }
+.santa-person-static { min-height: 1.75rem; padding-inline-start: calc(16px + .3rem); overflow-wrap: anywhere; }
+.santa-person-wishes > summary svg { flex: none; color: var(--muted); }
+.santa-person-wishes[open] > summary svg { transform: rotate(90deg); }
+.santa-person-wishes p { margin: .35rem 0; }
+.santa-exclusion-person { display: grid; justify-items: start; gap: .25rem; margin-block: .5rem 1.25rem; }
+.santa-former-recipient { margin-top: .25rem; color: var(--muted); font-size: .85rem; }
+.santa-pair-status { margin-block: .75rem; }

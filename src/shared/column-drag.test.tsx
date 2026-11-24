@@ -48,7 +48,7 @@ it('fits the menu above a short table, updates on resize and dismisses on Escape
   menu.getBoundingClientRect = () => new DOMRect(0, 250, 80, 30)
   table.getBoundingClientRect = () => new DOMRect(0, 290, 300, 50)
   fireEvent.click(summary)
-  const panel = menu.querySelector<HTMLElement>('[data-column-zone]')!
+  const panel = menu.querySelector<HTMLElement>('[data-reorder-zone]')!
   Object.defineProperty(panel, 'scrollHeight', { value: 400 })
   fireEvent.resize(window)
   expect(panel.dataset.side).toBe('above')
@@ -76,8 +76,8 @@ it('keeps headers sortable, scrolls the menu at its edge and cancels the frame o
   fireEvent.click(screen.getByText('Колонки'))
   const grip = screen.getByRole('button', { name: 'Переместить колонку Первая' })
   const destination = screen.getByRole('checkbox', { name: 'Вторая' })
-  const option = destination.closest<HTMLElement>('[data-column-id]')!
-  const panel = option.closest<HTMLElement>('[data-column-zone]')!
+  const option = destination.closest<HTMLElement>('[data-reorder-id]')!
+  const panel = option.closest<HTMLElement>('[data-reorder-zone]')!
   panel.getBoundingClientRect = () => new DOMRect(0, 0, 100, 100)
   Object.defineProperties(panel, { clientHeight: { value: 100 }, scrollHeight: { value: 300 } })
   const frames = new Map<number, FrameRequestCallback>()

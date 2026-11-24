@@ -313,6 +313,13 @@ small {
   background: var(--hover);
   color: var(--text);
 }
+.season-deadline:not(:empty) {
+  display: block;
+  margin-top: .2rem;
+  color: var(--muted);
+  font-size: .75rem;
+  font-weight: 400;
+}
 .nav-item.active {
   background: var(--selected);
   color: var(--text);

@@ -7,7 +7,6 @@ import {
   useState,
   useCallback,
   type ReactNode,
-  type PointerEvent,
 } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
@@ -25,13 +24,12 @@ import {
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
-  GripVertical,
   SlidersHorizontal,
 } from 'lucide-react'
 import { api, memberApi, type Page } from './api'
 import { positiveInteger } from './format'
 import { ErrorState } from './components'
-import './column-drag.css'
+import { ReorderHandle } from './ReorderHandle'
 
 declare module '@tanstack/react-table' {
   interface ColumnMeta<TData extends RowData, TValue> {
@@ -102,7 +100,7 @@ function ColumnMenu({ children }: { children: ReactNode }) {
         Колонки
       </summary>
       {open && (
-        <div ref={panel} className="columns-popover" data-column-zone>
+        <div ref={panel} className="columns-popover" data-reorder-zone>
           {children}
         </div>
       )}
@@ -110,97 +108,6 @@ function ColumnMenu({ children }: { children: ReactNode }) {
   )
 }
 
-function ColumnHandle({
-  id,
-  label,
-  items,
-  move,
-}: {
-  id: string
-  label: string
-  items: string[]
-  move: (from: string, to: string) => void
-}) {
-  const pointer = useRef<number | null>(null)
-  const highlight = useRef<HTMLElement | null>(null)
-  const frame = useRef<number | null>(null)
-  const stopScroll = () => {
-    if (frame.current !== null) cancelAnimationFrame(frame.current)
-    frame.current = null
-  }
-  const clear = () => {
-    stopScroll()
-    highlight.current?.removeAttribute('data-drop-target')
-    highlight.current = null
-    pointer.current = null
-  }
-  useEffect(() => clear, [])
-  const targetAt = (zone: Element | null, x: number, y: number) => {
-    const cell = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-column-id]')
-    return cell?.closest('[data-column-zone]') === zone ? cell : null
-  }
-  const showTarget = (cell: HTMLElement | null | undefined) => {
-    highlight.current?.removeAttribute('data-drop-target')
-    highlight.current = cell ?? null
-    if (cell && cell.dataset.columnId !== id) cell.setAttribute('data-drop-target', '')
-  }
-  const drag = (e: PointerEvent<HTMLButtonElement>) => {
-    stopScroll()
-    const zone = e.currentTarget.closest<HTMLElement>('[data-column-zone]')
-    if (!zone) return
-    const { clientX: x, clientY: y } = e
-    showTarget(targetAt(zone, x, y))
-    const rect = zone.getBoundingClientRect()
-    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return
-    const edge = Math.min(36, rect.height / 4)
-    const step = y < rect.top + edge ? -8 : y > rect.bottom - edge ? 8 : 0
-    if (!step || zone.scrollHeight <= zone.clientHeight) return
-    const tick = () => {
-      frame.current = null
-      const previous = zone.scrollTop
-      zone.scrollTop = Math.max(0, Math.min(zone.scrollHeight - zone.clientHeight, previous + step))
-      if (previous === zone.scrollTop) return
-      showTarget(targetAt(zone, x, y))
-      frame.current = requestAnimationFrame(tick)
-    }
-    frame.current = requestAnimationFrame(tick)
-  }
-  return (
-    <button
-      type="button"
-      className="column-grip"
-      aria-label={'Переместить колонку ' + label}
-      aria-keyshortcuts="ArrowUp ArrowDown"
-      onPointerDown={(e) => {
-        if (!e.isPrimary || e.button !== 0) return
-        e.preventDefault()
-        e.currentTarget.setPointerCapture(e.pointerId)
-        pointer.current = e.pointerId
-      }}
-      onPointerMove={(e) => {
-        if (pointer.current !== e.pointerId) return
-        drag(e)
-      }}
-      onPointerUp={(e) => {
-        if (pointer.current !== e.pointerId) return
-        const zone = e.currentTarget.closest('[data-column-zone]')
-        const destination = targetAt(zone, e.clientX, e.clientY)?.dataset.columnId
-        clear()
-        if (destination && destination !== id) move(id, destination)
-      }}
-      onPointerCancel={clear}
-      onLostPointerCapture={clear}
-      onKeyDown={(e) => {
-        if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
-        e.preventDefault()
-        const destination = items[items.indexOf(id) + (e.key === 'ArrowUp' ? -1 : 1)]
-        if (destination) move(id, destination)
-      }}
-    >
-      <GripVertical size={16} aria-hidden="true" />
-    </button>
-  )
-}
 export function useList<T>(
   endpoint: string,
   defaults: { sort: string; order?: string },
@@ -280,13 +187,19 @@ export function DataTable<T>({
   empty = 'Здесь пока нет записей',
   columnSettings,
   onResetColumns,
+  onRowClick,
+  rowClassName,
 }: {
   name: string
   columns: ColumnDef<T, unknown>[]
-  list: ReturnType<typeof useList<T>>
+  list: Pick<ReturnType<typeof useList<T>>, 'sort' | 'order' | 'page' | 'size' | 'setSort' | 'set' | 'reset'> & {
+    query: { data?: Page<T>; error?: Error | null; isFetching: boolean; isPending: boolean; refetch?: () => unknown }
+  }
   empty?: string
   columnSettings?: ReactNode
   onResetColumns?: () => void
+  onRowClick?: (item: T) => void
+  rowClassName?: (item: T) => string
 }) {
   const admin = useContext(AdministratorContext)
   const storageKey = 'hikari.columns.' + admin + '.' + name
@@ -344,7 +257,7 @@ export function DataTable<T>({
   })
   const meta = list.query.data?.page
   if (list.query.error)
-    return <ErrorState error={list.query.error} retry={() => void list.query.refetch()} />
+    return <ErrorState error={list.query.error} retry={list.query.refetch} />
   return (
     <section className="table-section" aria-label={name}>
       <div className="table-caption">
@@ -357,7 +270,7 @@ export function DataTable<T>({
           {table.getAllLeafColumns().map((c, index, all) => (
             <div
               className="column-option"
-              data-column-id={c.id}
+              data-reorder-id={c.id}
               key={c.id}
               draggable
               onDragStart={(e) => {
@@ -381,9 +294,9 @@ export function DataTable<T>({
                 />
                 {String(c.columnDef.header)}
               </label>
-              <ColumnHandle
+              <ReorderHandle
                 id={c.id}
-                label={String(c.columnDef.header)}
+                label={'Переместить колонку ' + String(c.columnDef.header)}
                 items={normalizedOrder}
                 move={move}
               />
@@ -464,7 +377,9 @@ export function DataTable<T>({
           </thead>
           <tbody>
             {table.getRowModel().rows.map((row) => (
-              <tr key={row.id}>
+              <tr key={row.id} className={rowClassName?.(row.original)} onClick={onRowClick && ((event) => {
+                if (event.target instanceof Element && !event.target.closest('a, button, input, select, summary')) onRowClick(row.original)
+              })}>
                 {row.getVisibleCells().map((cell) => (
                   <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
                 ))}

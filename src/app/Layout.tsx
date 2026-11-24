@@ -7,6 +7,9 @@ import { hikariRelease, version } from '../../package.json'
 import { memberApi, type MemberIdentity } from '../shared/api'
 import { ErrorState, Loading } from '../shared/components'
 import { AdministratorContext } from '../shared/table'
+import { LocalProfiles } from './LocalProfiles'
+import { useSantaVisibility } from '../modules/santa/model'
+import { SeasonDeadline } from '../modules/santa/SeasonDeadline'
 
 export default function Layout() {
   const [open, setOpen] = useState(false)
@@ -28,7 +31,8 @@ export default function Layout() {
   })
   const adminPath = location.pathname === '/admin' || location.pathname.startsWith('/admin/')
   const adminMode = !!me.data?.is_admin && adminPath
-  const navigation = adminMode ? modules : memberModules
+  const santa = useSantaVisibility(adminMode, !!me.data && (!adminPath || adminMode))
+  const navigation = (adminMode ? modules : memberModules).filter((m) => m.id !== 'santa' || santa.data?.visible)
   const current = navigation.find((m) =>
     (m.roots || [m.path]).some((path) => location.pathname === path || location.pathname.startsWith(path + '/')),
   )
@@ -38,7 +42,7 @@ export default function Layout() {
     queryFn: async () => {
       try {
         const r = await fetch('/api/dev/context')
-        return r.ok ? ((await r.json()) as { local: boolean }) : null
+        return r.ok ? ((await r.json()) as { local: boolean; profiles?: { key: string; name: string }[] }) : null
       } catch {
         return null
       }
@@ -156,11 +160,14 @@ export default function Layout() {
               className={() => 'nav-item ' + (current?.id === m.id ? 'active' : '')}
             >
               <m.icon size={20} strokeWidth={1.7} />
-              <span>{m.label}</span>
+              <span>{m.label}{m.id === 'santa' && santa.data?.visible && (
+                <SeasonDeadline season={santa.data} />
+              )}</span>
             </NavLink>
           ))}
         </nav>
         <div className="sidebar-bottom">
+          {environment.data?.local && <LocalProfiles profiles={environment.data.profiles ?? []} />}
           {me.data.is_admin && (
             <Link className="nav-item" to={adminMode ? '/events' : '/admin/events'}>
               <ArrowLeftRight size={20} strokeWidth={1.7} />
@@ -222,7 +229,7 @@ export default function Layout() {
         <main id="main-content" className="page-content">
             <AdministratorContext.Provider value={me.data.telegram_id}>
               <Suspense fallback={<Loading />}>
-                <Outlet />
+                <Outlet context={{ local: environment.data?.local === true }} />
               </Suspense>
             </AdministratorContext.Provider>
         </main>

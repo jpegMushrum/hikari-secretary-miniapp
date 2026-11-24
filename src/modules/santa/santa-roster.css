@@ -1,0 +1,30 @@
+.santa-person-row { cursor: pointer; }
+.santa-person-exit { --santa-mark: var(--accent); }
+.santa-person-ready { --santa-mark: var(--status-active, #38a479); }
+.santa-roster-legend {
+  display: flex; flex-wrap: wrap; gap: .35rem 1rem; color: var(--muted); font-size: .85rem;
+}
+.santa-roster-legend span { display: inline-flex; align-items: baseline; gap: .45rem; }
+.santa-roster-legend span::before {
+  content: ''; width: .55rem; height: .55rem; border-radius: 50%; background: var(--santa-mark);
+}
+.santa-person-row:is(.santa-person-exit, .santa-person-ready) > td {
+  background-color: color-mix(in srgb, var(--santa-mark) 10%, transparent);
+}
+.santa-person-row:is(.santa-person-exit, .santa-person-ready) > td:first-child {
+  box-shadow: inset 3px 0 var(--santa-mark);
+  padding-inline-start: .65rem;
+}
+.santa-person-name {
+  padding: .4rem 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  border: 0;
+  text-align: start;
+  cursor: pointer;
+}
+.santa-person-details { display: grid; gap: .9rem; margin: 1rem 0 1.5rem; }
+.santa-person-details dt { color: var(--muted); font-size: .85rem; }
+.santa-person-details dd { margin: .25rem 0 0; }

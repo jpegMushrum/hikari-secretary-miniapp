@@ -1,0 +1,10 @@
+.local-profiles {
+  display: grid;
+  gap: .5rem;
+  padding-block: .65rem;
+}
+.local-profiles label { display: grid; gap: .25rem; }
+.local-profiles button { justify-self: start; }
+.local-inbox { max-height: 9rem; overflow-y: auto; }
+.local-inbox p { margin: .5rem 0; }
+.local-notice-profile { display: block; width: fit-content; }

@@ -1,5 +1,5 @@
 import { lazy } from 'react'
-import { CalendarDays, Users, UserRound, MessageSquare, Sparkles } from 'lucide-react'
+import { CalendarDays, Users, UserRound, MessageSquare, Sparkles, Timer } from 'lucide-react'
 
 // Navigation metadata belongs to modules; layout does not know their count.
 export const modules = [
@@ -32,11 +32,16 @@ export const modules = [
     icon: MessageSquare,
     component: lazy(() => import('../modules/feedback/FeedbackPage')),
   },
+  {
+    id: 'santa', path: '/admin/santa', label: 'Тайный Санта', icon: Timer,
+    component: lazy(() => import('../modules/santa/AdminSanta')),
+  },
 ]
 export const memberModules = [
   { id: 'events', path: '/events', roots: ['/events'], label: 'Мероприятия', icon: CalendarDays, component: lazy(() => import('../modules/member/events/EventsPage')) },
   { id: 'profile', path: '/profile', roots: ['/profile'], label: 'Мой профиль', icon: UserRound, component: lazy(() => import('../modules/member/ProfilePage')) },
   { id: 'feedback', path: '/feedback', roots: ['/feedback'], label: 'Отзывы', icon: MessageSquare, component: lazy(() => import('../modules/member/FeedbackPage')) },
+  { id: 'santa', path: '/santa', label: 'Тайный Санта', icon: Timer, component: lazy(() => import('../modules/santa/MemberSanta')) },
 ]
 export const MemberEventDetail = lazy(() => import('../modules/member/events/EventDetail'))
 export const AIJobDetail = lazy(() => import('../modules/ai/AIJobDetail'))

@@ -5,13 +5,19 @@ import { pathToFileURL } from 'node:url'
 // Deliberately not a real Telegram token. This gateway must never use production credentials.
 export const DEV_TOKEN = 'local-miniapp-only-not-a-telegram-token'
 export const DEV_USER = 123456789
+const profiles = [
+  { key: 'admin', id: DEV_USER, first_name: 'Администратор', username: 'hikari_local' },
+  ...['Аня', 'Боря', 'Вера', 'Глеб'].map((first_name, i) => ({
+    key: 'member' + (i + 1), id: DEV_USER + i + 1, first_name, username: 'hikari_test_' + (i + 1),
+  })),
+]
 const hosts = new Set(['localhost:5173', '127.0.0.1:5173', 'localhost:5174', '127.0.0.1:5174'])
 const origins = new Set([...hosts].map((h) => 'http://' + h))
 
-export function initData(now = Math.floor(Date.now() / 1000)) {
+export function initData(now = Math.floor(Date.now() / 1000), profile = profiles[0]) {
   const data = new URLSearchParams({
     auth_date: String(now),
-    user: JSON.stringify({ id: DEV_USER, first_name: 'Администратор', username: 'hikari_local' }),
+    user: JSON.stringify({ id: profile.id, first_name: profile.first_name, username: profile.username }),
   })
   const check = [...data]
     .sort(([a], [b]) => a.localeCompare(b))
@@ -37,22 +43,29 @@ export function createGateway(upstream = 'http://backend:8080') {
       req.headers['sec-fetch-site'] === 'cross-site'
     )
       return json(403, { error: 'local_origin_required' })
-    if (req.method === 'GET' && req.url === '/api/dev/context') return json(200, { local: true })
+    const profile = profiles.find((p) => p.key === (req.headers['x-local-profile'] ?? 'admin'))
+    if (!profile) return json(400, { error: 'unknown_local_profile' })
+    if (req.method === 'GET' && req.url === '/api/dev/context')
+      return json(200, { local: true, profiles: profiles.map(({ key, first_name }) => ({ key, name: first_name })) })
+    const inbox = req.method === 'GET' && req.url === '/api/dev/inbox'
     // No proxying bot endpoints, arbitrary destinations, encoded paths, or traversal.
     const pathname = (req.url || '').split('?')[0]
     if (
-      !(/^\/api\/v1\/admin\/[a-z0-9/-]+$/.test(pathname) && ['GET', 'POST', 'PUT'].includes(req.method)) &&
+      !inbox && !(/^\/api\/v1\/admin\/[a-z0-9/-]+$/.test(pathname) && ['GET', 'POST', 'PUT'].includes(req.method)) &&
       !(/^\/api\/v1\/member\/[a-z0-9/-]+$/.test(pathname) && ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method))
     )
       return json(404, { error: 'not_found' })
-    const headers = { authorization: 'tma ' + initData(), accept: 'application/json' }
+    const headers = {
+      authorization: inbox ? 'Bearer local-dev-service-not-for-production' : 'tma ' + initData(undefined, profile),
+      accept: 'application/json',
+    }
     for (const key of ['content-type', 'content-length', 'idempotency-key'])
       if (req.headers[key]) headers[key] = req.headers[key]
     const proxy = request(
       {
         hostname: target.hostname,
         port: target.port || 80,
-        path: req.url,
+        path: inbox ? '/internal/dev/santa-notifications/' + profile.id : req.url,
         method: req.method,
         headers,
         timeout: 15000,

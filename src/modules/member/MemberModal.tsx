@@ -2,12 +2,13 @@ import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import './member.css'
 
-export function MemberModal({ title, children, onClose, large = false, busy = false }: {
+export function MemberModal({ title, children, onClose, large = false, busy = false, className = '' }: {
   title: string
   children: ReactNode
   onClose: () => void
   large?: boolean
   busy?: boolean
+  className?: string
 }) {
   const titleId = useId()
   const ref = useRef<HTMLDialogElement>(null)
@@ -22,7 +23,7 @@ export function MemberModal({ title, children, onClose, large = false, busy = fa
     }
   }, [])
   return (
-    <dialog ref={ref} className={'member-modal' + (large ? ' member-modal-large' : '')}
+    <dialog ref={ref} className={['member-modal', large && 'member-modal-large', className].filter(Boolean).join(' ')}
       aria-labelledby={titleId} onCancel={(event) => {
         event.preventDefault()
         if (!busy) onClose()
