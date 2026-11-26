@@ -2,7 +2,7 @@
   "name": "hikari-secretary-miniapp",
   "version": "0.3.0",
   "hikariRelease": {
-    "date": "2026-11-24",
+    "date": "2026-11-26",
     "bot": "1.0.2",
     "backend": "0.5.0"
   },
