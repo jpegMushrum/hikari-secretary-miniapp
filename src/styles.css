@@ -154,6 +154,8 @@
   --button: #bd3541;
   --input: #1c1d20;
   --selected: #2a2326;
+  --scroll-thumb: #727479;
+  --positive: #59bc88;
 }
 :root[data-theme='light'] {
   color-scheme: light;
@@ -168,6 +170,43 @@
   --button: #b52d39;
   --input: #fff;
   --selected: #f2e9e7;
+  --scroll-thumb: #898580;
+  --positive: #237747;
+}
+@media (hover: hover) and (pointer: fine) and (forced-colors: none) {
+  .table-scroll {
+    --scroll-thumb: var(--muted);
+    padding-block-end: 4px;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-track:vertical {
+    margin: 10px 0;
+  }
+  ::-webkit-scrollbar-button {
+    display: none;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--scroll-thumb);
+    background-clip: padding-box;
+    border: 2px solid transparent;
+    border-radius: 99px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--muted);
+  }
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--scroll-thumb) transparent;
+    }
+  }
 }
 * {
   box-sizing: border-box;
@@ -726,11 +765,11 @@ tbody tr:hover {
 .status-active {
   color: var(--text);
 }
-.status-registered {
-  color: #59bc88;
-}
-[data-theme='light'] .status-registered {
-  color: #237747;
+.status-positive,
+.status-registered,
+.status-attended,
+.status-sent {
+  color: var(--positive);
 }
 .status-cancelled {
   color: var(--muted);

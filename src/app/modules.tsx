@@ -36,12 +36,14 @@ export const modules = [
     id: 'santa', path: '/admin/santa', label: 'Тайный Санта', icon: Timer,
     component: lazy(() => import('../modules/santa/AdminSanta')),
   },
+  { id: 'mascot', path: '/admin/mascot', label: 'Выборы маскота', icon: Timer, component: lazy(() => import('../modules/mascot/AdminMascot')) },
 ]
 export const memberModules = [
   { id: 'events', path: '/events', roots: ['/events'], label: 'Мероприятия', icon: CalendarDays, component: lazy(() => import('../modules/member/events/EventsPage')) },
   { id: 'profile', path: '/profile', roots: ['/profile'], label: 'Мой профиль', icon: UserRound, component: lazy(() => import('../modules/member/ProfilePage')) },
   { id: 'feedback', path: '/feedback', roots: ['/feedback'], label: 'Отзывы', icon: MessageSquare, component: lazy(() => import('../modules/member/FeedbackPage')) },
   { id: 'santa', path: '/santa', label: 'Тайный Санта', icon: Timer, component: lazy(() => import('../modules/santa/MemberSanta')) },
+  { id: 'mascot', path: '/mascot', label: 'Выборы маскота', icon: Timer, component: lazy(() => import('../modules/mascot/MemberMascot')) },
 ]
 export const MemberEventDetail = lazy(() => import('../modules/member/events/EventDetail'))
 export const AIJobDetail = lazy(() => import('../modules/ai/AIJobDetail'))

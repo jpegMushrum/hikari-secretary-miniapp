@@ -84,7 +84,7 @@ export default function AIPage() {
         <form className="ai-settings" onSubmit={submit}>
           <div className="section-heading">
             <h2>Подготовка материалов</h2>
-            <span className="muted">
+            <span className={settings.data.enabled ? 'status-positive' : 'muted'}>
               {settings.data.enabled ? 'Генератор подключён' : 'Генератор не подключён'}
             </span>
           </div>

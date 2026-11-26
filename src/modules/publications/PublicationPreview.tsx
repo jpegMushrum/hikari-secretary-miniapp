@@ -1,5 +1,6 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { apiBlob, memberApiBlob, type Publication, type MessageEntity } from '../../shared/api'
+import { type ReactNode } from 'react'
+import { type Publication, type MessageEntity } from '../../shared/api'
+import { ProtectedImage } from '../../shared/ProtectedImage'
 import { TelegramMentions } from '../../shared/TelegramLink'
 
 export function safeLink(raw: unknown): string | undefined {
@@ -94,39 +95,6 @@ export function EntityText({
   )
 }
 
-function PreviewImage({ path, member }: { path: string; member: boolean }) {
-  const [url, setUrl] = useState<string>(),
-    [error, setError] = useState(false)
-  useEffect(() => {
-    const controller = new AbortController()
-    let objectURL: string | undefined
-    setUrl(undefined)
-    setError(false)
-    const load = member ? memberApiBlob : apiBlob
-    load(path, controller.signal)
-      .then((blob) => {
-        if (!controller.signal.aborted) {
-          objectURL = URL.createObjectURL(blob)
-          setUrl(objectURL)
-        }
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setError(true)
-      })
-    return () => {
-      controller.abort()
-      if (objectURL) URL.revokeObjectURL(objectURL)
-    }
-  }, [path, member])
-  return error ? (
-    <p className="muted">Изображение недоступно. Оригинал сохранён в Telegram.</p>
-  ) : url ? (
-    <img src={url} alt="Изображение анонса" loading="lazy" />
-  ) : (
-    <p className="muted">Загружаем изображение…</p>
-  )
-}
-
 function richText(value: unknown, depth = 0, allowMentions = true): ReactNode {
   if (depth > 20) return null
   if (typeof value === 'string') return allowMentions ? <TelegramMentions text={value} /> : value
@@ -200,7 +168,7 @@ export function PublicationPreview({
     ? '/publications/' + publication.id
     : '/events/' + memberEventId
   const renderImage = (position: number) => (
-    <PreviewImage key={position} path={mediaBase + '/media/' + position} member={memberEventId != null} />
+    <ProtectedImage key={position} alt="Изображение анонса" fallback="Изображение недоступно. Оригинал сохранён в Telegram." path={mediaBase + '/media/' + position} member={memberEventId != null} />
   )
   const blocks = (values: unknown, depth = 0): ReactNode => {
     if (depth > 20 || !Array.isArray(values)) return null

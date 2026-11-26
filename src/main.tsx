@@ -29,6 +29,7 @@ const client = new QueryClient({
   },
 })
 const root = ReactDOM.createRoot(document.getElementById('root')!)
+const MascotScreen = React.lazy(() => import('./modules/mascot/MascotScreen'))
 function start() {
   root.render(
     <React.StrictMode>
@@ -36,6 +37,7 @@ function start() {
         <QueryClientProvider client={client}>
           <BrowserRouter>
             <Routes>
+              <Route path="/admin/mascot/screen" element={<React.Suspense><MascotScreen /></React.Suspense>} />
               <Route element={<Layout />}>
                 <Route path="/admin" element={<Navigate to="/admin/events" replace />} />
                 <Route index element={null} />

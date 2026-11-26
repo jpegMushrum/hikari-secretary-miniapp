@@ -97,7 +97,7 @@ function MemberEvent({ event }: { event: EventCard }) {
         action={<Status value={event.status} />}
       />
       <p className="member-personal-status">
-        Мой статус · <strong>{personalStatuses[event.personal_status]}</strong>
+        Мой статус · <strong className={'status-' + event.personal_status}>{personalStatuses[event.personal_status]}</strong>
       </p>
       {event.announcement && (
         <PublicationPreview publication={event.announcement} memberEventId={event.id} />

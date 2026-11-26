@@ -10,6 +10,8 @@ import { AdministratorContext } from '../shared/table'
 import { LocalProfiles } from './LocalProfiles'
 import { useSantaVisibility } from '../modules/santa/model'
 import { SeasonDeadline } from '../modules/santa/SeasonDeadline'
+import { Countdown } from '../shared/Countdown'
+import { useMascotVisibility } from '../modules/mascot/model'
 
 export default function Layout() {
   const [open, setOpen] = useState(false)
@@ -31,8 +33,11 @@ export default function Layout() {
   })
   const adminPath = location.pathname === '/admin' || location.pathname.startsWith('/admin/')
   const adminMode = !!me.data?.is_admin && adminPath
-  const santa = useSantaVisibility(adminMode, !!me.data && (!adminPath || adminMode))
-  const navigation = (adminMode ? modules : memberModules).filter((m) => m.id !== 'santa' || santa.data?.visible)
+  const checkSeasons = !!me.data && (!adminPath || adminMode)
+  const santa = useSantaVisibility(adminMode, checkSeasons)
+  const mascot = useMascotVisibility(adminMode, checkSeasons)
+  const visibility: Record<string, boolean | undefined> = { santa: santa.data?.visible, mascot: mascot.data?.visible }
+  const navigation = (adminMode ? modules : memberModules).filter(m => !(m.id in visibility) || visibility[m.id])
   const current = navigation.find((m) =>
     (m.roots || [m.path]).some((path) => location.pathname === path || location.pathname.startsWith(path + '/')),
   )
@@ -162,6 +167,8 @@ export default function Layout() {
               <m.icon size={20} strokeWidth={1.7} />
               <span>{m.label}{m.id === 'santa' && santa.data?.visible && (
                 <SeasonDeadline season={santa.data} />
+              )}{m.id === 'mascot' && mascot.data?.submission_until && (
+                <Countdown until={mascot.data.submission_until} label="До закрытия формы" />
               )}</span>
             </NavLink>
           ))}

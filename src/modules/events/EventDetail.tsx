@@ -110,7 +110,9 @@ export default function EventDetail() {
     {
       accessorKey: 'attended',
       header: 'Был на встрече',
-      cell: (i) => yesNo(i.getValue() as boolean | null),
+      cell: ({ row }) => row.original.attended === true
+        ? <span className="status-positive">Был</span>
+        : row.original.attended === false ? 'Не был' : 'Не указано',
     },
     {
       accessorKey: 'needs_pass',

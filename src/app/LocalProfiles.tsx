@@ -23,7 +23,8 @@ export function LocalProfiles({ profiles }: { profiles: Profile[] }) {
       <select value={selected} onChange={e => {
         const key = e.target.value
         sessionStorage.setItem('hikari.localProfile', key)
-        window.location.assign(key === 'admin' ? '/admin/santa' : '/santa')
+        const section = window.location.pathname.split('/').includes('mascot') ? 'mascot' : 'santa'
+        window.location.assign((key === 'admin' ? '/admin/' : '/') + section)
       }}>{profiles.map(p => <option key={p.key} value={p.key}>{p.name}</option>)}</select>
     </label>
     <button className="text-link" type="button" aria-expanded={open} onClick={() => setOpen(!open)}>Тестовые уведомления</button>

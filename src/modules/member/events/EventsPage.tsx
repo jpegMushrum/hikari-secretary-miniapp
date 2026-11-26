@@ -45,7 +45,9 @@ export default function MemberEventsPage() {
     {
       accessorKey: 'personal_status',
       header: 'Мой статус',
-      cell: ({ row }) => personalStatuses[row.original.personal_status],
+      cell: ({ row }) => <span className={'status-' + row.original.personal_status}>
+        {personalStatuses[row.original.personal_status]}
+      </span>,
     },
   ]
   return (

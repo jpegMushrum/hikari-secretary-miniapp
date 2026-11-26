@@ -1,6 +1,6 @@
 .santa-person-row { cursor: pointer; }
 .santa-person-exit { --santa-mark: var(--accent); }
-.santa-person-ready { --santa-mark: var(--status-active, #38a479); }
+.santa-person-ready { --santa-mark: var(--positive); }
 .santa-roster-legend {
   display: flex; flex-wrap: wrap; gap: .35rem 1rem; color: var(--muted); font-size: .85rem;
 }
