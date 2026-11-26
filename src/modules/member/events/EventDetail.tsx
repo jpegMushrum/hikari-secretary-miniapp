@@ -2,17 +2,24 @@ import { useState } from 'react'
 import { ReminderPicker } from './ReminderPicker'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocation, useParams } from 'react-router-dom'
-import { memberApi } from '../../../shared/api'
+import { ApiError, memberApi } from '../../../shared/api'
 import { BackLink, ErrorState, Loading, PageHeader, Status } from '../../../shared/components'
 import { dateTime } from '../../../shared/format'
+import { TelegramMentions } from '../../../shared/TelegramLink'
 import { PublicationPreview, safeLink } from '../../publications/PublicationPreview'
 import { FeedbackDialog } from '../FeedbackDialog'
+import { MemberModal } from '../MemberModal'
 import { RegistrationDialog } from './RegistrationDialog'
 import { personalStatuses, type EventCard, type RegistrationProfile } from './model'
 import './events.css'
 
 export default function MemberEventDetail() {
-  const { id } = useParams()
+  const { id = '' } = useParams()
+  return <EventPage key={id} id={id} />
+}
+
+function EventPage({ id }: { id: string }) {
+  const [firstVisitAdmin, setFirstVisitAdmin] = useState<string | null>(null)
   const { state } = useLocation()
   const from =
     typeof state?.from === 'string' && /^\/events(?:\?|$)/.test(state.from) ? state.from : '/events'
@@ -21,6 +28,7 @@ export default function MemberEventDetail() {
     queryFn: ({ signal }) => memberApi<EventCard>('/events/' + id, { signal }),
     refetchInterval: 30000,
   })
+  const accessLost = event.error instanceof ApiError && [401, 403, 404].includes(event.error.status)
   return (
     <>
       <BackLink to={from}>К мероприятиям</BackLink>
@@ -29,13 +37,23 @@ export default function MemberEventDetail() {
       ) : event.error ? (
         <ErrorState error={event.error} retry={() => void event.refetch()} />
       ) : (
-        <MemberEvent key={id} event={event.data} />
+        <MemberEvent event={event.data} onFirstVisit={setFirstVisitAdmin} />
+      )}
+      {firstVisitAdmin && !accessLost && (
+        <MemberModal title="Вы зарегистрированы" onClose={() => setFirstVisitAdmin(null)}>
+          <p>
+            Перед первой встречей обязательно напишите администратору{' '}
+            <TelegramMentions text={'@' + firstVisitAdmin} /> в личные сообщения.
+            Для оформления пропуска понадобятся ваши персональные данные.
+          </p>
+          <p>В дальнейшем при записи на встречу регистрация пройдёт автоматически. Повторно писать администратору не нужно.</p>
+        </MemberModal>
       )}
     </>
   )
 }
 
-function MemberEvent({ event }: { event: EventCard }) {
+function MemberEvent({ event, onFirstVisit }: { event: EventCard; onFirstVisit: (username: string) => void }) {
   const client = useQueryClient()
   const [registration, setRegistration] = useState<{ minutes: number | null } | null>(null)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
@@ -43,8 +61,14 @@ function MemberEvent({ event }: { event: EventCard }) {
   const base = '/events/' + event.id
   const change = useMutation({
     mutationFn: ({ path, method, body }: { path: string; method: string; body?: object }) =>
-      memberApi<void>(base + path, { method, ...(body && { body: JSON.stringify(body) }) }),
-    onSuccess: () => setRegistration(null),
+      memberApi<{ first_visit_admin_username?: string } | void>(base + path, {
+        method,
+        ...(body && { body: JSON.stringify(body) }),
+      }),
+    onSuccess: (result) => {
+      setRegistration(null)
+      if (result?.first_visit_admin_username) onFirstVisit(result.first_visit_admin_username)
+    },
     onSettled: () =>
       Promise.all([
         client.invalidateQueries({ queryKey: ['member', 'event', String(event.id)] }),

@@ -142,7 +142,7 @@ it('keeps the chosen reminder through first-registration modal and requires both
         can_manage_registration: true,
         reminder_offset_minutes: request.reminder_offset_minutes,
       }
-      return new Response(null, { status: 204 })
+      return json({ first_visit_admin_username: 'club_admin' })
     }
     if (url === '/api/v1/member/events/5') return json(event)
     throw new Error(url)
@@ -181,7 +181,41 @@ it('keeps the chosen reminder through first-registration modal and requires both
       profile: { full_name: 'Анна Клубова', is_russian_citizen: true, is_itmo_student: false },
     },
   ])
+  const notice = await screen.findByRole('dialog', { name: 'Вы зарегистрированы' })
+  expect(within(notice).getByRole('link', { name: '@club_admin' }).getAttribute('href')).toBe(
+    'https://t.me/club_admin',
+  )
+  await user.click(within(notice).getByRole('button', { name: 'Закрыть' }))
+  cleanup()
+  mount('/events/5')
+  await screen.findByText('Зарегистрирован')
   expect(screen.queryByRole('dialog')).toBeNull()
+})
+
+it.each([503, 403, 404])('handles a detail refresh returning %s after first registration', async (status) => {
+  const user = userEvent.setup()
+  let registered = false
+  vi.stubGlobal('fetch', async (url: string, opts: RequestInit) => {
+    if (url.endsWith('/registration') && opts.method === 'POST') {
+      registered = true
+      return json({ first_visit_admin_username: 'club_admin' })
+    }
+    if (url.endsWith('/events/5')) {
+      return registered ? new Response(null, { status }) : json({ ...meeting, profile_complete: true })
+    }
+    throw new Error(url)
+  })
+  mount('/events/5')
+  await user.click(await screen.findByRole('button', { name: 'Зарегистрироваться' }))
+  await screen.findByText('Не получилось выполнить действие')
+  expect(screen.queryByText(meeting.title)).toBeNull()
+  if (status === 503) {
+    const notice = await screen.findByRole('dialog', { name: 'Вы зарегистрированы' })
+    expect(within(notice).getByRole('link', { name: '@club_admin' })).toBeTruthy()
+    await user.click(within(notice).getByRole('button', { name: 'Закрыть' }))
+  }
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(screen.getByRole('button', { name: 'Повторить' })).toBeTruthy()
 })
 
 it('uses off when the preferred interval is unavailable, then manages the registration in one request per action', async () => {
