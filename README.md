@@ -320,4 +320,5 @@ Compose сам задаёт боту `APP_ENV=development` и
 
 ## Дальнейшее развитие
 
-Приоритеты собраны в [плане miniapp](https://github.com/jpegMushrum/hikari-secretary/blob/main/docs/miniapp-plan.md).
+Режимы и экраны описаны в [руководстве по miniapp](https://github.com/jpegMushrum/hikari-secretary/blob/main/docs/miniapp.md).
+Ближайшие работы собраны в [roadmap платформы](https://github.com/jpegMushrum/hikari-secretary/blob/main/docs/roadmap.md).
