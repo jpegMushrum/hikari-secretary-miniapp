@@ -16,7 +16,7 @@ const entry: Entry = { id: 10, name: 'Кицунэ', description: 'Лисёно�
 function state(phase: View['season']['phase'], changes: Partial<View> = {}): View {
   return {
     season: { id: 2, phase, round: 1, deadline: null, winner_id: null },
-    eligible: false, ready: false, can_ready: false, entries: [], voters: [],
+    eligible: false, can_vote: false, entries: [],
     card: null, remaining: 0, rounds: [], finalists: [], pending_images: [], ...changes,
   }
 }
@@ -94,25 +94,44 @@ it('losing submission eligibility disables an open editor and still allows cance
   expect(screen.getByRole('dialog', { name: /Отозвать/ })).toBeTruthy()
 })
 
-it('allows an ineligible author to confirm voting readiness in a new round', async () => {
-  const view = state('readiness', { can_ready: true })
-  view.season.round = 3
+it('opens voting directly after moderation and counts on admin confirmation', async () => {
+  let view = state('moderation', { entries: [entry, { ...entry, id: 11, name: 'Сова' }] })
+  view.season.round = 0
   const commands: object[] = []
   vi.stubGlobal('fetch', async (_path: string, options?: RequestInit) => {
     if (options?.method === 'POST') {
-      commands.push(JSON.parse(options.body as string)); view.ready = true
+      const command = JSON.parse(options.body as string)
+      commands.push(command)
+      view = state(command.action === 'start' ? 'voting' : 'results')
       return new Response(null, { status: 204 })
     }
     return json(view)
   })
+  mount(<AdminMascot />)
+  await userEvent.click(await screen.findByRole('button', { name: 'Начать голосование' }))
+  await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Начать голосование' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Подсчитать голоса' }))
+  expect(commands).toEqual([{ action: 'start', season_id: 2, round: 0 }])
+  await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Подсчитать голоса' }))
+  await screen.findByRole('heading', { name: 'Закрытые итоги' })
+  expect(commands[1]).toEqual({ action: 'finish', season_id: 2, round: 1 })
+})
+
+it.each([
+  [1, false, 'Участие в этом туре недоступно.'],
+  [2, true, 'Вы оценили все карточки. Ожидаем завершения тура.'],
+  [2, false, 'В этом туре голосуют участники первого тура.'],
+] as const)('shows ballot availability in round %i when can_vote is %s', async (round, eligible, message) => {
+  const view = state('voting', { can_vote: eligible })
+  view.season.round = round
+  vi.stubGlobal('fetch', async () => json(view))
   mount(<MemberMascot />)
-  await userEvent.click(await screen.findByRole('button', { name: 'Я готов' }))
-  expect(commands).toEqual([{ action: 'ready', season_id: 2, round: 3 }])
-  expect(await screen.findByText(/Готовность подтверждена/)).toBeTruthy()
+  await screen.findByText(message)
+  expect(screen.queryByRole('button', { name: 'Я готов' })).toBeNull()
 })
 
 it('shows an anonymous concept and its per-image AI marking, submits a skip and resumes from the next card', async () => {
-  const view = state('voting', { ready: true, card: { ...entry, images: [{ key: 'a', ai: true }, { key: 'b', ai: false }] }, remaining: 2 })
+  const view = state('voting', { can_vote: true, card: { ...entry, images: [{ key: 'a', ai: true }, { key: 'b', ai: false }] }, remaining: 2 })
   const commands: object[] = []
   vi.stubGlobal('fetch', async (path: string, options?: RequestInit) => {
     if (path.includes('/images/')) return new Response('', { status: 404 })
@@ -237,6 +256,7 @@ it('discards abandoned uploads only after the user confirms the snapshot', async
 
 it('starts another runoff with only the selected leaders', async () => {
   const view = state('results', { entries: [entry, { ...entry, id: 12, name: 'Сова' }, { ...entry, id: 13, name: 'Кот' }], finalists: [10, 12, 13] })
+  view.rounds = [{ number: 1, cancelled: false, rows: [{ entry_id: 10, name: entry.name, place: 1, likes: 0, skips: 1, percent: 0 }] }]
   view.season.round = 2
   const commands: object[] = []
   vi.stubGlobal('fetch', async (_path: string, options?: RequestInit) => {
@@ -246,8 +266,21 @@ it('starts another runoff with only the selected leaders', async () => {
   mount(<Routes><Route element={<Outlet context={{ local: false }} />}><Route index element={<AdminMascot />} /></Route></Routes>)
   await userEvent.click(await screen.findByRole('checkbox', { name: 'Сова' }))
   expect(screen.queryByRole('button', { name: 'Перезапустить тестовые выборы' })).toBeNull()
-  await userEvent.click(screen.getByRole('button', { name: 'Открыть сбор на тур 3' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Начать тур 3' }))
   await waitFor(() => expect(commands).toEqual([{ action: 'runoff', entry_ids: [10, 13], season_id: 2, round: 2 }]))
+})
+
+it('offers manual winner selection after a first round without any responses', async () => {
+  const finalists = [entry, { ...entry, id: 12, name: 'Сова' }]
+  const rows = finalists.map(({ id, name }) => ({ entry_id: id, name, place: 1, likes: 0, skips: 0, percent: null }))
+  const view = state('results', { entries: finalists, finalists: [10, 12], rounds: [{ number: 1, cancelled: false, rows }] })
+  vi.stubGlobal('fetch', async () => json(view))
+  mount(<AdminMascot />)
+  await screen.findByText(/Для повторного тура нет участников/)
+  expect(screen.queryByRole('button', { name: 'Начать тур 2' })).toBeNull()
+  await userEvent.selectOptions(screen.getByLabelText('Победитель по решению организатора'), '12')
+  await userEvent.click(screen.getByRole('button', { name: 'Утвердить победителя вручную' }))
+  expect(await screen.findByRole('dialog', { name: 'Утвердить победителя?' })).toBeTruthy()
 })
 
 it('starts a fresh local season only after the admin confirms the reset', async () => {
@@ -316,11 +349,11 @@ it('keeps a projected concept open during a network failure and closes it if acc
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 })
 
-it('links ready voters by Telegram username or by Telegram ID and does not use a club ID for the link', async () => {
-  vi.stubGlobal('fetch', async () => json(state('readiness', { voters: [
-    { person_id: 1, name: 'Аня', excluded: false, username: 'club_anya', telegram_id: 1001 },
-    { person_id: 2, name: 'Боря', excluded: false, telegram_id: 1002 },
-    { person_id: 3, name: 'Вера', excluded: false },
+it('links concept authors during moderation by Telegram username or Telegram ID', async () => {
+  vi.stubGlobal('fetch', async () => json(state('moderation', { entries: [
+    { ...entry, author: 'Аня', author_username: 'club_anya', author_telegram_id: 1001 },
+    { ...entry, id: 11, author: 'Боря', author_telegram_id: 1002 },
+    { ...entry, id: 12, author: 'Вера' },
   ] })))
   mount(<AdminMascot />)
   expect((await screen.findByRole('link', { name: '@club_anya' })).getAttribute('href')).toBe('https://t.me/club_anya')

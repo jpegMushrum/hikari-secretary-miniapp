@@ -54,12 +54,6 @@ function MemberPhase({ view }: { view: View }) {
       </MemberModal>}
     </>}
     {season.phase === 'moderation' && <p>Приём завершён. Организаторы проверяют заявки.</p>}
-    {season.phase === 'readiness' && <section className="mascot-section">
-      <h2>Сбор голосующих, тур {season.round}</h2>
-      {view.ready ? <p role="status"><span className="status-positive">Готовность подтверждена.</span> Ждём начала голосования.</p>
-        : view.can_ready ? <button className="button primary" disabled={action.isPending} onClick={() => action.mutate({ action: 'ready' })}>Я готов</button>
-          : <p>Участие в этом туре недоступно.</p>}
-    </section>}
     {season.phase === 'voting' && <section className="mascot-section">
       {card ? <>
         <p className="muted">Осталось карточек: {view.remaining}</p>
@@ -68,7 +62,8 @@ function MemberPhase({ view }: { view: View }) {
           <button className="button secondary" disabled={action.isPending} onClick={() => action.mutate({ action: 'vote', entry_id: card.id, like: false })}>Пропустить</button>
           <button className="button primary" disabled={action.isPending} onClick={() => action.mutate({ action: 'vote', entry_id: card.id, like: true })}><Heart size={18} aria-hidden="true" />Нравится</button>
         </div>
-      </> : <p>{view.ready ? 'Вы оценили все карточки. Ожидаем завершения тура.' : 'Голосование уже началось. Состав участников зафиксирован.'}</p>}
+      </> : <p>{view.can_vote ? 'Вы оценили все карточки. Ожидаем завершения тура.'
+        : season.round === 1 ? 'Участие в этом туре недоступно.' : 'В этом туре голосуют участники первого тура.'}</p>}
     </section>}
     {season.phase === 'results' && <p>Голосование завершено. Ожидаем объявления результатов.</p>}
     {season.phase === 'published' && <Results scope="member" seasonID={season.id} entries={entries} winnerID={season.winner_id} rounds={view.rounds} />}

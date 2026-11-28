@@ -31,7 +31,7 @@ export default function AdminMascot() {
 }
 
 function AdminPhase({ view, local }: { view: View; local: boolean }) {
-  const { season, entries, voters, finalists, rounds } = view
+  const { season, entries, finalists, rounds } = view
   const { phase, round, winner_id: winnerID } = season
   const action = useMascotActions('admin', season)
   const busy = action.isPending
@@ -40,19 +40,19 @@ function AdminPhase({ view, local }: { view: View; local: boolean }) {
   const [selected, setSelected] = useState<number[]>(finalists)
   const [winner, setWinner] = useState<number | ''>('')
   const approved = entries.filter(entry => entry.approved)
-  const ready = voters.filter(person => !person.excluded)
   function confirm(title: string, explanation: ReactNode, button: string, command: Action) {
     action.reset()
     setConfirmation({ title, explanation, button, command })
   }
   const name = (id: number) => entries.find(entry => entry.id === id)?.name ?? rounds.flatMap(r => r.rows).find(row => row.entry_id === id)?.name ?? ('Заявка ' + id)
   const betweenRounds = phase === 'results' && winnerID == null && finalists.length > 1
-  const inRunoff = round > 1 && (phase === 'readiness' || phase === 'voting')
+  const firstRoundHasVotes = rounds.find(r => r.number === 1)?.rows.some(row => row.likes > 0 || row.skips > 0)
+  const inRunoff = round > 1 && phase === 'voting'
   return <article className="mascot-page">
     <PageHeader title="Выборы маскота" />
     <section className="mascot-section">
       <small className="muted">Сезон №{season.id}</small>
-      <h2>{phaseLabel[phase]}{round > 0 && (phase === 'readiness' || phase === 'voting') && ', тур ' + round}</h2>
+      <h2>{phaseLabel[phase]}{round > 0 && phase === 'voting' && ', тур ' + round}</h2>
       {phase === 'preparation' && <form className="mascot-form" onSubmit={e => { e.preventDefault(); action.mutate({ action: 'open', deadline: firstClosedDate(lastDay) }) }}>
         <label>Последний день приёма концептов<input required type="date" value={lastDay} onChange={e => setLastDay(e.target.value)} /></label>
         <small className="muted">В этот день можно подать концепт до 23:59 МСК включительно.</small>
@@ -64,17 +64,8 @@ function AdminPhase({ view, local }: { view: View; local: boolean }) {
           onClick={() => confirm('Завершить тестовый приём?', 'Тестовый сезон перейдёт к модерации. Редактирование работ завершится.', 'Завершить приём', { action: 'test_deadline' })}>Завершить тестовый приём</button>}
       </>}
       {phase === 'moderation' && <p className="muted">Допущено работ: {approved.length} из {entries.length}</p>}
-      {phase === 'readiness' && <>
-        <p>Подтвердили готовность: {ready.length}</p>
-        <ul className="mascot-voters">{voters.map(person => <li key={person.person_id}>
-          <PersonContact name={person.name} username={person.username} telegramID={person.telegram_id} />{person.excluded ? <small>Исключён</small> : <button className="text-button" disabled={busy}
-            onClick={() => confirm('Исключить из тура?', <><PersonContact name={person.name} username={person.username} telegramID={person.telegram_id} /> не сможет проголосовать в этом туре.</>, 'Исключить', { action: 'exclude', person_id: person.person_id })}>Исключить</button>}
-        </li>)}</ul>
-        <button className="button primary" disabled={busy || !ready.length}
-          onClick={() => confirm('Начать голосование?', 'После старта новые голосующие присоединиться к туру не смогут.', 'Начать тур', { action: 'start' })}>Начать голосование</button>
-      </>}
-      {phase === 'voting' && <button className="button secondary" disabled={busy}
-        onClick={() => confirm('Закончить голосование досрочно?', 'В зачёт войдут все уже полученные ответы, в том числе из незавершённых бюллетеней.', 'Закончить тур', { action: 'finish' })}>Закончить голосование досрочно</button>}
+      {phase === 'voting' && <button className="button primary" disabled={busy}
+        onClick={() => confirm('Подсчитать голоса?', 'Голосование в этом туре закроется. Будут учтены все полученные ответы, в том числе из незавершённых бюллетеней.', 'Подсчитать голоса', { action: 'finish' })}>Подсчитать голоса</button>}
       {(phase === 'results' || phase === 'published') && <div className="mascot-section">
         <div className="button-row">
           <Link className="button secondary" to="/admin/mascot/screen"><Monitor size={18} aria-hidden="true" />Открыть итоги для проектора</Link>
@@ -96,15 +87,15 @@ function AdminPhase({ view, local }: { view: View; local: boolean }) {
         </button>}
       </EntryPreview>)}
       {phase === 'moderation' && <button className="button primary" disabled={busy || !approved.length}
-        onClick={() => confirm('Завершить модерацию?', approved.length === 1
+        onClick={() => confirm(approved.length === 1 ? 'Завершить модерацию?' : 'Начать голосование?', approved.length === 1
           ? 'Единственная допущенная работа «' + approved[0].name + '» станет победителем.'
-          : 'Участники смогут подтвердить готовность. Изменение списка работ завершится.',
-          approved.length === 1 ? 'Завершить модерацию' : 'Открыть сбор', { action: 'collect' })}>
-        {approved.length === 1 ? 'Завершить модерацию' : 'Открыть сбор голосующих'}
+          : 'Участники смогут голосовать за допущенные концепты до подсчёта голосов.',
+          approved.length === 1 ? 'Завершить модерацию' : 'Начать голосование', { action: 'start' })}>
+        {approved.length === 1 ? 'Завершить модерацию' : 'Начать голосование'}
       </button>}
     </section>}
     {(phase === 'results' || phase === 'published') && <Results scope="admin" seasonID={season.id} entries={entries} winnerID={winnerID} rounds={rounds} />}
-    {betweenRounds && <section className="mascot-form">
+    {betweenRounds && firstRoundHasVotes && <section className="mascot-form">
       <h2>Следующий тур</h2>
       <fieldset><legend>Кого включить из лидеров?</legend>
         {finalists.map(id => <label key={id} className="mascot-check">
@@ -113,9 +104,10 @@ function AdminPhase({ view, local }: { view: View; local: boolean }) {
         </label>)}
       </fieldset>
       <button type="button" className="button primary" disabled={busy || selected.length < 2}
-        onClick={() => action.mutate({ action: 'runoff', entry_ids: selected })}>Открыть сбор на тур {round + 1}</button>
+        onClick={() => action.mutate({ action: 'runoff', entry_ids: selected })}>Начать тур {round + 1}</button>
     </section>}
     {(betweenRounds || inRunoff) && <section className="mascot-form">
+      {betweenRounds && !firstRoundHasVotes && <p>В первом туре никто не проголосовал. Для повторного тура нет участников.</p>}
       <label>Победитель по решению организатора<select value={winner} onChange={e => setWinner(e.target.value ? Number(e.target.value) : '')}>
         <option value="">Выберите маскота</option>{finalists.map(id => <option key={id} value={id}>{name(id)}</option>)}
       </select></label>

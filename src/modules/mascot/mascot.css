@@ -22,10 +22,7 @@
 }
 .mascot-form textarea { resize: vertical; }
 .mascot-check, .mascot-form .mascot-check { display: flex; align-items: center; gap: .6rem; min-height: 2.5rem; }
-.mascot-voters small { color: var(--muted); font-size: .85rem; }
 .mascot-vote { margin-top: 1.25rem; }
-.mascot-voters { list-style: none; padding: 0; }
-.mascot-voters li { display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-top: 1px solid var(--line); min-height: 2.8rem; }
 .mascot-results { display: grid; gap: 1.5rem; }
 .mascot-chart { table-layout: fixed; max-width: 52rem; border-top: 1px solid var(--line); }
 .mascot-rank-col { width: 2.25em; }

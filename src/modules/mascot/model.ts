@@ -2,20 +2,19 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError, memberApi } from '../../shared/api'
 
 export type Scope = 'admin' | 'member'
-export type Phase = 'preparation' | 'submissions' | 'moderation' | 'readiness' | 'voting' | 'results' | 'published'
+export type Phase = 'preparation' | 'submissions' | 'moderation' | 'voting' | 'results' | 'published'
 export const phaseLabel: Record<Phase, string> = {
   preparation: 'Подготовка', submissions: 'Приём концептов', moderation: 'Модерация',
-  readiness: 'Сбор голосующих', voting: 'Голосование', results: 'Закрытые итоги', published: 'Итоги',
+  voting: 'Голосование', results: 'Закрытые итоги', published: 'Итоги',
 }
 export type ImageRef = { key: string; ai: boolean }
 export type Entry = { id: number; name: string; description: string; images: ImageRef[]; approved: boolean; author?: string; author_username?: string; author_telegram_id?: number }
-export type Voter = { person_id: number; name: string; excluded: boolean; username?: string; telegram_id?: number }
 export type Result = { entry_id: number; name: string; place: number; likes: number; skips: number; percent: number | null }
 export type Round = { number: number; cancelled: boolean; rows: Result[] }
 export type View = {
   season: { id: number; phase: Phase; deadline: string | null; round: number; winner_id: number | null }
-  eligible: boolean; ready: boolean; can_ready: boolean
-  entries: Entry[]; voters: Voter[]; card: Entry | null; remaining: number; rounds: Round[]; finalists: number[]
+  eligible: boolean; can_vote: boolean
+  entries: Entry[]; card: Entry | null; remaining: number; rounds: Round[]; finalists: number[]
   pending_images: string[]
 }
 
@@ -32,9 +31,9 @@ export async function discardImages(keys: string[]) {
   return failed
 }
 export type Action = { action: 'open'; deadline: string } | { action: 'moderate'; entry_id: number; approved: boolean }
-  | { action: 'collect' | 'start' | 'finish' | 'publish' | 'ready' }
+  | { action: 'start' | 'finish' | 'publish' }
   | { action: 'choose' | 'withdraw'; entry_id: number } | { action: 'runoff'; entry_ids: number[] }
-  | { action: 'exclude'; person_id: number } | { action: 'vote'; entry_id: number; like: boolean }
+  | { action: 'vote'; entry_id: number; like: boolean }
   | { action: 'submit'; entry_id: number; name: string; description: string; images: ImageRef[]; request_id: string }
   | { action: 'test_deadline' | 'test_reset' }
 export type Send = (command: Action) => Promise<void>
