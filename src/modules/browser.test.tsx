@@ -135,6 +135,7 @@ it('configures a bot draft without sending original content back, then schedules
   }
   const fetcher = vi.fn(async (input: string, options?: RequestInit) => {
     if (input.endsWith('/targets')) return json([{ key: 'demo', name: 'Демо-канал' }])
+    if (input.endsWith('/event-templates')) return json([])
     if (input.endsWith('/schedule')) return json({ scheduled: true })
     return json(publication)
   })
@@ -161,12 +162,52 @@ it('configures a bot draft without sending original content back, then schedules
   ])
   expect(JSON.parse(String(writes[0][1]?.body))).toEqual({
     target_keys: ['demo'],
+    delivery_mode: 'forward',
+    reposts: [],
     event: {
       title: 'Встреча',
       starts_at: '2099-01-01T18:00:00+03:00',
       ends_at: '2099-01-01T20:00:00+03:00',
     },
   })
+})
+
+it('keeps the original separate from its scheduled forwards in the draft', async () => {
+  const user = userEvent.setup()
+  const fetcher = vi.fn(async (path: string, init?: RequestInit) => {
+    if (path.endsWith('/targets')) return json([{ key: 'one', name: 'Канал' }, { key: 'two', name: 'Клуб' }])
+    if (init?.method) return json({})
+    return json({ id: 3, text: 'Анонс', status: 'draft', entities: [], media: [], deliveries: [], delivery_mode: 'forward' })
+  })
+  vi.stubGlobal('fetch', fetcher)
+  mount(<PublicationDetail />, '/admin/publications/3')
+  await user.click(await screen.findByRole('radio', { name: 'Канал' }))
+  await user.click(screen.getByRole('button', { name: 'Добавить репост' }))
+  await user.selectOptions(screen.getByLabelText('Куда переслать'), 'two')
+  await user.click(screen.getByRole('button', { name: 'Сохранить настройки' }))
+  await screen.findByText('Настройки сохранены')
+  const write = fetcher.mock.calls.find(([path]) => path.endsWith('/settings'))
+  expect(JSON.parse(String(write?.[1]?.body))).toMatchObject({
+    target_keys: ['one'], delivery_mode: 'forward', reposts: [{ target_key: 'two', scheduled_at: null }],
+  })
+})
+
+it('cancels just the selected forward when its original is unavailable', async () => {
+  const user = userEvent.setup()
+  const fetcher = vi.fn(async (path: string, init?: RequestInit) => {
+    if (path.endsWith('/targets')) return json([])
+    if (init?.method) return json({})
+    return json({ id: 3, text: 'Анонс', status: 'sent', media: [], entities: [], deliveries: [],
+      reposts: [{ id: 19, source_delivery_id: 9, target_name: 'Клуб', target_key: 'two', status: 'needs_decision', scheduled_at: null }] })
+  })
+  vi.stubGlobal('fetch', fetcher)
+  mount(<PublicationDetail />, '/admin/publications/3')
+  await user.click(await screen.findByRole('button', { name: 'Изменить репост' }))
+  await user.click(screen.getByRole('button', { name: 'Отменить репост' }))
+  await waitFor(() => expect(fetcher.mock.calls.filter(([, init]) => init?.method)).toHaveLength(1))
+  const [url, init] = fetcher.mock.calls.find(([, opts]) => opts?.method)!
+  expect(url).toBe('/api/v1/admin/publications/3/reposts/19')
+  expect(JSON.parse(String(init?.body))).toEqual({ action: 'cancel' })
 })
 
 it('AI settings remain editable without a provider key', async () => {

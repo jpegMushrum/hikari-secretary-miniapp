@@ -1,3 +1,8 @@
+export function moscowInput(raw: string | null | undefined) {
+  if (!raw) return ''
+  return new Date(new Date(raw).getTime() + 3 * 3600000).toISOString().slice(0, 16)
+}
+
 export const dateTime = (value: string | null | undefined) =>
   value
     ? new Intl.DateTimeFormat('ru-RU', {

@@ -212,14 +212,14 @@ export function PublicationPreview({
           return <pre key={index}>{text}</pre>
         case 'list':
           return (
-            <ul key={index}>
+            <ul key={index} className="rich-list" role="list">
               {Array.isArray(b.items) &&
                 b.items.map((item, i) => {
                   const li = item as Record<string, unknown>
                   return (
                     <li key={i}>
-                      {richText(li.label)}
-                      {blocks(li.blocks, depth + 1)}
+                      <span>{richText(li.label) || '•'}</span>
+                      <div>{blocks(li.blocks, depth + 1)}</div>
                     </li>
                   )
                 })}

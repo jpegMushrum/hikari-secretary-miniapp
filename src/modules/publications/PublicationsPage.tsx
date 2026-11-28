@@ -1,8 +1,10 @@
 import { Link, useLocation } from 'react-router-dom'
+import { useState } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { DataTable, useList } from '../../shared/table'
 import { BackLink, PageHeader, SelectFilter, Status } from '../../shared/components'
 import { dateTime } from '../../shared/format'
+import { RepostQueue } from './Reposts'
 
 type Item = {
   id: number
@@ -14,6 +16,9 @@ type Item = {
 export default function PublicationsPage() {
   const location = useLocation(),
     list = useList<Item>('/publications', { sort: 'created_at', order: 'desc' }, ['status'])
+  const [showQueue, setShowQueue] = useState(
+    () => new URLSearchParams(location.search).get('view') === 'reposts',
+  )
   const columns: ColumnDef<Item, unknown>[] = [
     { accessorKey: 'id', header: 'ID' },
     {
@@ -50,6 +55,14 @@ export default function PublicationsPage() {
         title="Анонсы и черновики"
         description="Отправьте или перешлите анонс боту. В ответ он предложит открыть черновик здесь или продолжить в чате."
       />
+      <details
+        className="publication-preview"
+        open={showQueue}
+        onToggle={(e) => setShowQueue(e.currentTarget.open)}
+      >
+        <summary>Очередь репостов</summary>
+        {showQueue && <RepostQueue />}
+      </details>
       <div className="toolbar">
         <SelectFilter
           label="Статус публикации"

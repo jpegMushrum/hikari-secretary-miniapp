@@ -147,6 +147,8 @@ export type FeedbackDetail = Omit<Feedback, 'author_name'> & {
   event_title: string | null
 }
 export type Publication = {
+  delivery_mode?: 'forward' | 'separate'
+  reposts?: Repost[]
   entities: MessageEntity[] | null
   rich_message: Record<string, unknown> | null
   media: { position: number; url: string }[]
@@ -157,11 +159,26 @@ export type Publication = {
   scheduled_at: string | null
   media_ids: string[]
   deliveries: {
+    id?: number
+    can_forward?: boolean
+    published_at?: string | null
+    url?: string | null
     target_key: string
     target_name: string
     status: string
     last_error: string | null
   }[]
+}
+export type Repost = {
+  id: number
+  source_delivery_id: number
+  target_key: string
+  target_name: string
+  scheduled_at: string | null
+  sent_at: string | null
+  status: string
+  last_error: string | null
+  url: string | null
 }
 export type MessageEntity = {
   type: string
